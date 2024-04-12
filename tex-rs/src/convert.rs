@@ -6,12 +6,12 @@ use crate::convert::TextureConversionError::DirectXTexError;
 use crate::texture_map::{MipLevel, RenderFormat, TextureMap};
 use crate::texture_map::RenderFormat::R16G16B16A16;
 
-#[derive(Error)]
-enum TextureConversionError{
-    #[error("Io error")]
+#[derive(Error, Debug)]
+pub enum TextureConversionError{
+    #[error("Io error {0}")]
     IoError(#[from] io::Error),
 
-    #[error("DirectxTex error")]
+    #[error("DirectxTex error {0}")]
     DirectXTexError(#[from] HResultError),
 
     #[error("Invalid texture: {0}")]
@@ -42,27 +42,28 @@ pub fn create_dds(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
         dimension: header.dimensions.into(),
     };
 
-    let images = mips.iter_mut().map(|mip| -> Image {
-        let pitch = DXGI_FORMAT::from(header.format).compute_pitch(mip.width, mip.height, CP_FLAGS::CP_FLAGS_NONE).map_err(|e| TextureConversionError::DirectXTexError(e))?;
+    let images_result: Result<Vec<Image>, TextureConversionError> = mips.iter_mut().map(|mip| -> Result<Image, TextureConversionError> {
+        let pitch = DXGI_FORMAT::from(header.format).compute_pitch(mip.width, mip.height, CP_FLAGS::CP_FLAGS_NONE).map_err(|e| DirectXTexError(e))?;
 
-        Image {
+        Ok(Image {
             width: mip.width,
             height: mip.height,
             format: header.format.into(),
             row_pitch: pitch.row,
             slice_pitch: pitch.slice,
             pixels: mip.data.as_mut_ptr(),
-        }
+        })
+    }).collect();
 
-    }).collect::<Vec<Image>>();
+    let images = images_result?;
 
     let blob = directxtex::save_dds(images.as_slice(), &meta_data, DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT).map_err(|e| DirectXTexError(e))?;
-    Ok(blob.buffer().into_vec())
+    Ok(Vec::from(blob.buffer()))
 }
 
 pub fn create_tga(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
     let dds = create_dds(tex)?;
-    let scratch_image = ScratchImage::load_dds(dds.buffer(), DDS_FLAGS::DDS_FLAGS_NONE, None, None).map_err(|e| DirectXTexError(e))?;
+    let scratch_image = ScratchImage::load_dds(dds.as_slice(), DDS_FLAGS::DDS_FLAGS_NONE, None, None).map_err(|e| DirectXTexError(e))?;
 
     //TODO: convert the 2-channel textures to the correct color space (R8G8, BC5)
 
@@ -85,7 +86,7 @@ pub fn create_tga(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
 
     let decompressed = directxtex::decompress(scratch_image.images(), scratch_image.metadata(), format).unwrap();
     let blob = decompressed.image(0, 0, 0).unwrap().save_tga(TGA_FLAGS::TGA_FLAGS_NONE, None).map_err(|e|DirectXTexError(e))?;
-    Ok(blob.buffer().into_vec())
+    Ok(Vec::from(blob.buffer()))
 }
 
 
@@ -115,7 +116,7 @@ pub fn create_mip_dds(tex: &TextureMap, mip_level: usize) -> Result<Vec<u8>, Tex
         };
 
         let blob = directxtex::save_dds(&[image], &meta_data, DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT).map_err(|e| DirectXTexError(e))?;
-        Ok(blob.buffer().into_vec())
+        Ok(Vec::from(blob.buffer()))
     }else{
         Err(TextureConversionError::MipOutOfBounds(mip_level, tex.get_num_mip_levels()))
     }

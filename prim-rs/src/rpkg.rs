@@ -5,7 +5,7 @@ use crate::render_primitive::RenderPrimitive;
 impl GlacierResource for RenderPrimitive {
     type Output = RenderPrimitive;
 
-    fn process_data(_: rpkg_rs::WoaVersion, data: impl IntoIterator<Item=u8>) -> Result<Self::Output, GlacierResourceError> {
+    fn process_data<R: AsRef<[u8]>>(_: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
         let mut stream = Cursor::new(data);
         RenderPrimitive::parse_bytes(&mut stream).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }

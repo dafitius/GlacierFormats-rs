@@ -111,7 +111,7 @@ fn main() {
             };
 
             let dds = convert::create_dds(&tex).unwrap();
-            fs::write(output_path.as_path(), dds.buffer()).expect("TODO: panic message");
+            fs::write(output_path.as_path(), dds).expect("TODO: panic message");
         },
         Command::ConvertTextureMapToTga(cmd) => {
 
@@ -128,7 +128,7 @@ fn main() {
             };
 
             let tga = convert::create_tga(&tex).unwrap();
-            fs::write(output_path.as_path(), tga.buffer()).unwrap()
+            fs::write(output_path.as_path(), tga).unwrap()
         }
         // Add other subcommand branches here
     }

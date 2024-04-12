@@ -32,8 +32,8 @@ impl RenderPrimitive {
         Ok(prim)
     }
 
-    pub fn parse_bytes<A : Read>(data: &mut A) -> BinResult<RenderPrimitive> {
-        let prim: RenderPrimitive = data.read_ne()?;
+    pub fn parse_bytes<A : Read + Seek>(data: &mut A) -> BinResult<RenderPrimitive> {
+        let prim = RenderPrimitive::read_le_args(data, ())?;
         Ok(prim)
     }
 

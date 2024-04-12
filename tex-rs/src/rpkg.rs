@@ -18,8 +18,7 @@ impl From<rpkg_rs::WoaVersion> for WoaVersion {
 impl GlacierResource for TextureMap {
     type Output = TextureMap;
 
-    fn process_data(woa_version: rpkg_rs::WoaVersion, data: impl IntoIterator<Item=u8>) -> Result<Self::Output, GlacierResourceError> {
-        let data: Vec<_> = data.into_iter().collect();
+    fn process_data<R: AsRef<[u8]>>(woa_version: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
         let mut stream = Cursor::new(data);
         TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
