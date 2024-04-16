@@ -7,7 +7,6 @@ use binrw::helpers::until_eof;
 use bitfield_struct::bitfield;
 use directxtex::{DXGI_FORMAT, TEX_DIMENSION};
 use crate::WoaVersion;
-use crate::texture_map::RenderFormat::DXT1;
 use crate::texture_map::TextureData::Mipblock1;
 
 
@@ -61,13 +60,36 @@ pub enum RenderFormat
     BC5 = 0x55,
     //hi-res color + full alpha. Used for pretty much everything...
     BC7 = 0x5A,
+}
 
+impl RenderFormat {
+    pub fn is_compressed(&self) -> bool {
+        matches!(self, RenderFormat::DXT1|
+            RenderFormat::DXT3|
+            RenderFormat::DXT5|
+            RenderFormat::BC4|
+            RenderFormat::BC5|
+            RenderFormat::BC7)
+    }
+
+    pub fn num_channels(&self) -> usize {
+        match self {
+            RenderFormat::A8 | RenderFormat::BC4 => 1,
+            RenderFormat::R8G8 | RenderFormat::BC5 => 2,
+            RenderFormat::DXT1 | //assume DXT1a
+            RenderFormat::R16G16B16A16 |
+            RenderFormat::R8G8B8A8 |
+            RenderFormat::DXT3 |
+            RenderFormat::DXT5 |
+            RenderFormat::BC7 => 4,
+        }
+    }
 }
 
 impl From<RenderFormat> for DXGI_FORMAT {
     fn from(value: RenderFormat) -> Self {
         match value {
-            RenderFormat::R16G16B16A16 => { DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_FLOAT }
+            RenderFormat::R16G16B16A16 => { DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_UNORM }
             RenderFormat::R8G8B8A8 => { DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM }
             RenderFormat::R8G8 => { DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM }
             RenderFormat::A8 => { DXGI_FORMAT::DXGI_FORMAT_A8_UNORM }
@@ -166,7 +188,6 @@ pub struct MipLevel {
 #[derive(Clone)]
 #[br(assert(num_textures == 1 && num_textures != 6, "Looks like you tried to export a cubemap texture, those are not supported yet"))]
 pub struct TextureMapHeaderV1 {
-
     #[br(temp)]
     #[bw(calc(1))]
     num_textures: u16,
@@ -196,29 +217,27 @@ pub struct TextureMapHeaderV1 {
     atlas_data_offset: u32,
 }
 
-impl TextureMapHeaderV1{
-
+impl TextureMapHeaderV1 {
     pub(crate) fn get_text_scale(&self) -> usize
     {
         let texd_mips = self.num_mips_levels as usize;
 
-        if texd_mips == 1{
+        if texd_mips == 1 {
             return 0;
         }
 
-        if self.interpret_as == TextureType::Billboard{
+        if self.interpret_as == TextureType::Billboard {
             return 0;
         }
 
-        if self.interpret_as == TextureType::UNKNOWN64{
+        if self.interpret_as == TextureType::UNKNOWN64 {
             //TODO: Delete this when it's confirmed that it doesn't exist
             println!("DELETE ME!!!!!");
             return 0;
         }
 
-        let area = self.width as usize * self.height as usize ;
-        let lesser_maps = ((area as f32).log2() * 0.5 - 6.5).floor() as usize;
-        return lesser_maps;
+        let area = self.width as usize * self.height as usize;
+        ((area as f32).log2() * 0.5 - 6.5).floor() as usize
     }
 }
 
@@ -278,36 +297,34 @@ pub struct TextureMapHeaderV2 {
     atlas_data_offset: u32,
 }
 
-impl TextureMapHeaderV2{
-
+impl TextureMapHeaderV2 {
     pub(crate) fn get_text_scale(&self) -> usize
     {
         let texd_mips = self.num_mips_levels as usize;
-        if texd_mips == 1{
+        if texd_mips == 1 {
             return 0;
         }
 
-        if self.type_ == TextureType::Billboard{
+        if self.type_ == TextureType::Billboard {
             return 0;
         }
 
-        if self.type_ == TextureType::UNKNOWN64{
+        if self.type_ == TextureType::UNKNOWN64 {
             //TODO: Delete this when it's confirmed that it doesn't exist
             println!("DELETE ME!!!!!");
             return 0;
         }
 
-        if self.format == DXT1 && self.width * self.height == 16{
+        if self.format == RenderFormat::DXT1 && self.width * self.height == 16 {
             return 1;
         }
 
-        if self.texd_identifier != 16384{
-           return 0;
+        if self.texd_identifier != 16384 {
+            return 0;
         }
 
         let area = self.width as usize * self.height as usize;
-        let lesser_maps = ((area as f32).log2() * 0.5 - 6.5).floor() as usize;
-        return lesser_maps;
+        ((area as f32).log2() * 0.5 - 6.5).floor() as usize
     }
 }
 
@@ -430,14 +447,14 @@ pub enum TextureMap {
     V3(TextureMapInner<TextureMapHeaderV3>),
 }
 
-impl BinWrite for TextureMap{
+impl BinWrite for TextureMap {
     type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
         match self {
-            TextureMap::V1(h) => {writer.write_type(h, Endian::Little)?}
-            TextureMap::V2(h) => {writer.write_type(h, Endian::Little)?}
-            TextureMap::V3(h) => {writer.write_type(h, Endian::Little)?}
+            TextureMap::V1(h) => { writer.write_type(h, Endian::Little)? }
+            TextureMap::V2(h) => { writer.write_type(h, Endian::Little)? }
+            TextureMap::V3(h) => { writer.write_type(h, Endian::Little)? }
         }
 
         let file_size = writer.stream_position()?;
@@ -456,16 +473,16 @@ impl BinWrite for TextureData {
     type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
-        match self{
-            TextureData::Tex(data) => {writer.write_type(data, endian)}
-            Mipblock1(_) => {todo!()}
+        match self {
+            TextureData::Tex(data) => { writer.write_type(data, endian) }
+            Mipblock1(_) => { todo!() }
         }
     }
 }
 
 #[binrw]
 #[derive(Debug)]
-pub struct AtlasEntry{
+pub struct AtlasEntry {
     left_up_unk1: f32,
     left_up_unk2: f32,
     left_up_x: f32,
@@ -492,13 +509,13 @@ pub struct AtlasEntry{
 #[br(import(total_size: u32))]
 #[br(assert(total_size - 12 == (width * height) * 0x40, "oops! u are wrong"))]
 #[br(assert(unk1 == 4, "Oh wow, it's not equal to four, it's {}", unk1))]
-pub struct AtlasData{
+pub struct AtlasData {
     pub unk1: u32,
     pub width: u32,
     pub height: u32,
 
-    #[br(count = (width*height) as usize)]
-    pub entries: Vec<AtlasEntry>
+    #[br(count = (width * height) as usize)]
+    pub entries: Vec<AtlasEntry>,
 }
 
 #[binrw]
@@ -509,7 +526,7 @@ pub struct TextureMapInner<
     pub header: A,
 
     //I would like to seek_before = SeekFrom::Start(TextureMapHeaderArgs::from(header.clone()).atlas_data_offset as u64) here, but H1 and 2 have a -8 offset on the pointer
-    #[brw(if(TextureMapHeaderArgs::from(header.clone()).atlas_data_size > 0))]
+    #[brw(if (TextureMapHeaderArgs::from(header.clone()).atlas_data_size > 0))]
     #[br(args(TextureMapHeaderArgs::from(header.clone()).atlas_data_size))]
     pub atlas_data: Option<AtlasData>,
 
@@ -517,7 +534,7 @@ pub struct TextureMapInner<
     pub data: TextureData,
 }
 
-impl<A: for<'a> BinRead<Args<'a>=()> + Clone + for<'a> binrw::BinWrite<Args<'a> = ()>> TextureMapInner<A> where TextureMapHeaderArgs: From<A> {
+impl<A: for<'a> BinRead<Args<'a>=()> + Clone + for<'a> binrw::BinWrite<Args<'a>=()>> TextureMapInner<A> where TextureMapHeaderArgs: From<A> {
     pub fn get_data(&self) -> &Vec<u8> {
         match &self.data {
             TextureData::Tex(d) => { d }
@@ -598,13 +615,11 @@ impl TextureMap {
     }
 
     pub fn width(&self) -> usize {
-        if self.has_mipblock1_data(){ self.get_header_args().texd_width }
-        else { self.get_header().width }
+        if self.has_mipblock1_data() { self.get_header_args().texd_width } else { self.get_header().width }
     }
 
     pub fn height(&self) -> usize {
-        if self.has_mipblock1_data(){ self.get_header_args().texd_height }
-        else { self.get_header().height }
+        if self.has_mipblock1_data() { self.get_header_args().texd_height } else { self.get_header().height }
     }
 
     fn has_mipblock1_data(&self) -> bool {
@@ -618,46 +633,42 @@ impl TextureMap {
     pub(crate) fn get_text_scaling(&self) -> usize
     {
         let texd_mips = self.get_header_args().num_mips_levels as usize;
-        if texd_mips == 1{
+        if texd_mips == 1 {
             return texd_mips;
         }
 
-        if if self.get_version() == WoaVersion::HM3 {self.get_header().type_} else {self.get_header().interpret_as} == TextureType::Billboard{
+        if if self.get_version() == WoaVersion::HM3 { self.get_header().type_ } else { self.get_header().interpret_as } == TextureType::Billboard {
             return texd_mips;
         }
 
-        if self.get_header().interpret_as == TextureType::UNKNOWN64{
+        if self.get_header().interpret_as == TextureType::UNKNOWN64 {
             return texd_mips;
         }
 
-        if self.get_version() == WoaVersion::HM2 && self.get_header().format == DXT1 && self.get_header_args().texd_width * self.get_header_args().texd_height == 16{
+        if self.get_version() == WoaVersion::HM2 && self.get_header().format == RenderFormat::DXT1 && self.get_header_args().texd_width * self.get_header_args().texd_height == 16 {
             return texd_mips - 1;
         }
 
-        match self{
-            TextureMap::V2(g) => {
-                if g.header.texd_identifier != 16384{
-                    return texd_mips;
-                }
+        if let TextureMap::V2(g) = self{
+            if g.header.texd_identifier != 16384 {
+                return texd_mips;
             }
-            _ => {}
-        };
+        }
 
         let area = self.get_header_args().texd_width * self.get_header_args().texd_height;
-        let lesser_maps = ((area as f32).log2() * 0.5 - 6.5).floor() as usize;
-        return lesser_maps;
+        ((area as f32).log2() * 0.5 - 6.5).floor() as usize
     }
 
     pub(crate) fn derive_text_mip_level(&self) -> Option<usize> {
         let mips_sizes: Vec<u32> = self.get_header_args().block_sizes.to_vec();
 
         let mips = mips_sizes.iter().enumerate().map(|(i, x)| if x > &0 {
-            if i == 0{
-                *mips_sizes.get(0).unwrap()
-            }else{
+            if i == 0 {
+                *mips_sizes.first().unwrap()
+            } else {
                 x - mips_sizes.get(i - 1).unwrap_or(&0)
             }
-        } else {0}).collect::<Vec<_>>();
+        } else { 0 }).collect::<Vec<_>>();
 
 
         let mut sizes = Vec::new();
@@ -681,11 +692,9 @@ impl TextureMap {
 
         if let Some(text_mip_count) = index_of(sizes.clone(), self.get_data().len() as u32, 8) {
             return Some(text_mip_count + 1);
-        } else {
-            if self.has_atlas() {
-                //println!("couldn't find mip count, because of an atlas");
-                return None;
-            }
+        } else if self.has_atlas() {
+            //println!("couldn't find mip count, because of an atlas");
+            return None;
         }
         None
     }
@@ -770,13 +779,4 @@ fn max_mips_count(width: usize, height: usize) -> usize {
     }).count();
 
     mip_levels.min(0xE)
-}
-
-fn get_file_as_byte_vec(filename: &Path) -> Vec<u8> {
-    let mut f = File::open(filename).expect("no file found");
-    let metadata = fs::metadata(filename).expect("unable to read metadata");
-    let mut buffer = vec![0; metadata.len() as usize];
-    f.read_exact(&mut buffer).expect("buffer overflow");
-
-    buffer
 }
