@@ -186,14 +186,14 @@ struct ConstrainProperties
 #[repr(u32)]
 enum ClothBendConstrainType
 {
-    ClothBendConstrainTypeStick = 0,
-    ClothBendConstrainTypeTriangle = 1,
+    Stick = 0,
+    Triangle = 1,
 }
 
 #[repr(u32)]
 enum ClothStretchConstrainType
 {
-    ClothBendConstrainTypeAnchor = 0,
-    ClothBendConstrainTypeLra = 1,
-    ClothBendConstrainTypeNone = 2,
+    Anchor = 0,
+    Lra = 1,
+    None = 2,
 }

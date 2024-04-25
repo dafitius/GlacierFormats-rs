@@ -37,7 +37,7 @@ impl GlacierResource for TextureMap {
 }
 
 pub fn get_full_texture(manager: &rpkg_rs::runtime::resource::partition_manager::PartitionManager, woa_version: rpkg_rs::WoaVersion, rrid: rpkg_rs::runtime::resource::runtime_resource_id::RuntimeResourceID) -> Result<TextureMap, GlacierResourceError> {
-    let res_info = manager.get_resource_info_from("chunk0".parse().unwrap(), rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+    let res_info = manager.get_resource_info_from(&"chunk0".parse().unwrap(), &rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
     let data = manager.get_resource_from("chunk0".parse().unwrap(), rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
 
     let mut stream = Cursor::new(data);

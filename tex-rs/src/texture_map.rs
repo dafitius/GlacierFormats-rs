@@ -1,7 +1,5 @@
-use std::fs::File;
-use std::{fs, io};
-use std::io::{Cursor, Read, Seek, Write};
-use std::path::Path;
+use std::io;
+use std::io::{Cursor, Seek, Write};
 use binrw::{BinRead, binread, BinResult, binrw, BinWrite, BinWriterExt, Endian};
 use binrw::helpers::until_eof;
 use bitfield_struct::bitfield;
