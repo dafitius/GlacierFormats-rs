@@ -4,15 +4,11 @@ use crate::math::Vector4;
 use crate::prim_object::PrimObject;
 use crate::render_primitive::{align_writer, PrimPropertyFlags};
 
-#[cfg(feature = "serde")]
-use serde::{Serialize};
-
 use crate::prim_sub_mesh::PrimSubMesh;
 
 #[binread]
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[br(import(global_properties: PrimPropertyFlags))]
 pub struct PrimMesh
 {

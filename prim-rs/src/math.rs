@@ -2,8 +2,6 @@ use std::iter::Sum;
 use std::ops;
 use bincode::Encode;
 use binrw::{BinRead, BinWrite};
-#[cfg(feature = "serde")]
-use serde::Serialize;
 
 pub trait Vector: Copy {
     fn add(&self, other: &Self) -> Self;
@@ -13,7 +11,6 @@ pub trait Vector: Copy {
     fn max(&self, other: &Self) -> Self;
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(BinRead, BinWrite, Debug, Clone, Copy, Default, PartialEq, Encode)]
 pub struct Vector4 {
     pub x: f32,
@@ -80,7 +77,6 @@ impl Vector for Vector4 {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(BinRead, BinWrite, Debug, Clone, Copy, Default, PartialEq, Encode)]
 pub struct Vector3 {
     pub x: f32,
@@ -130,7 +126,6 @@ impl Vector for Vector3 {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(BinRead, BinWrite, Debug, Clone, Copy, Default, PartialEq, Encode)]
 pub struct Vector2 {
     pub x: f32,
@@ -174,7 +169,6 @@ impl Vector for Vector2 {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(BinRead, BinWrite, Debug, Clone, Copy, PartialEq, Encode)]
 pub struct Color {
     pub r: u8,
@@ -195,7 +189,6 @@ impl Default for Color {
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct BoundingBox<V> {
     pub min: V,
     pub max: V,

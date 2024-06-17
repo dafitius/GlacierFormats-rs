@@ -3,12 +3,8 @@ use binrw::{BinRead, binread, BinResult, BinWrite, BinWriterExt, Endian};
 use crate::math::{BoundingBox, Vector3};
 use crate::render_primitive::align_writer;
 
-#[cfg(feature = "serde")]
-use serde::{Serialize};
-
 #[binread]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct BoxColi {
     #[br(temp)]
     pub num_chunks: u16,

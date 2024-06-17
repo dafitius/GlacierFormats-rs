@@ -4,16 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-binrw = "0.13.3"
-itertools = "0.12.1"
+binrw = "0.14.0"
+itertools = "0.13.0"
 modular-bitfield = "0.11.2"
 num-traits = "0.2.18"
 obj = "0.10.2"
-serde = { version = "1.0.196", features = ["derive"], optional = true }
-serde_json = { version = "1.0.113" , optional = true}
 bincode = "2.0.0-rc.3"
-base64 = "0.21.7"
-rpkg-rs = { path = "/home/dafitius/Documents/GitHub/rpkg-rs", optional = true }
+base64 = "0.22.1"
+rpkg-rs = { version = "1.0.0-rc.1", optional = true }
 
 [features]
 default = ["rpkg"]

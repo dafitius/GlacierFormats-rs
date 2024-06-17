@@ -152,6 +152,7 @@ pub struct RenderResourceMiscFlags
     __: u32,
 }
 
+#[derive(Debug)]
 pub struct TextureMapHeader {
     pub type_: TextureType,
     pub flags: RenderResourceMiscFlags,
@@ -161,14 +162,10 @@ pub struct TextureMapHeader {
     pub(crate) default_mip_level: u8,
     pub interpret_as: TextureType,
     pub dimensions: Dimensions,
-}
-
-#[derive(Debug)]
-pub struct TextureMapHeaderArgs {
     pub(crate) mips_sizes: Vec<u32>,
     pub(crate) block_sizes: Vec<u32>,
-    atlas_data_size: u32,
-    atlas_data_offset: u32,
+    pub(crate) atlas_data_size: u32,
+    pub(crate) atlas_data_offset: u32,
     pub(crate) texd_width: usize,
     pub(crate) texd_height: usize,
     pub(crate) num_mips_levels: u8,
@@ -185,6 +182,7 @@ pub struct MipLevel {
 #[derive(Debug)]
 #[derive(Clone)]
 #[br(assert(num_textures == 1 && num_textures != 6, "Looks like you tried to export a cubemap texture, those are not supported yet"))]
+#[bw(import(data_size: usize))]
 pub struct TextureMapHeaderV1 {
     #[br(temp)]
     #[bw(calc(1))]
@@ -193,11 +191,10 @@ pub struct TextureMapHeaderV1 {
     #[brw(pad_after = 1)]
     type_: TextureType,
 
-    #[br(temp)]
-    #[bw(calc(0xFF))]
     texd_identifier: u32,
+
     #[br(temp)]
-    #[bw(calc(69))]
+    #[bw(calc(data_size as u32))]
     file_size: u32,
     flags: RenderResourceMiscFlags,
     width: u16,
@@ -228,12 +225,6 @@ impl TextureMapHeaderV1 {
             return 0;
         }
 
-        if self.interpret_as == TextureType::UNKNOWN64 {
-            //TODO: Delete this when it's confirmed that it doesn't exist
-            println!("DELETE ME!!!!!");
-            return 0;
-        }
-
         let area = self.width as usize * self.height as usize;
         ((area as f32).log2() * 0.5 - 6.5).floor() as usize
     }
@@ -251,21 +242,15 @@ impl From<TextureMapHeaderV1> for TextureMapHeader {
             default_mip_level: val.default_mip_level,
             interpret_as: val.interpret_as,
             dimensions: val.dimensions,
-        }
-    }
-}
 
-impl From<TextureMapHeaderV1> for TextureMapHeaderArgs {
-    fn from(value: TextureMapHeaderV1) -> Self {
-        TextureMapHeaderArgs {
-            mips_sizes: value.mips_sizes.into_iter().filter(|x| *x != 0).collect(),
-            block_sizes: value.mips_sizes.into_iter().filter(|x| *x != 0).collect(),
-            atlas_data_size: value.atlas_data_size,
-            atlas_data_offset: value.atlas_data_offset,
-            texd_width: value.width as usize,
-            texd_height: value.height as usize,
-            num_mips_levels: value.num_mips_levels,
-            text_mips_levels: value.num_mips_levels - value.get_text_scale() as u8,
+            mips_sizes: val.mips_sizes.into_iter().filter(|x| *x != 0).collect(),
+            block_sizes: val.mips_sizes.into_iter().filter(|x| *x != 0).collect(),
+            atlas_data_size: val.atlas_data_size,
+            atlas_data_offset: val.atlas_data_offset,
+            texd_width: val.width as usize,
+            texd_height: val.height as usize,
+            num_mips_levels: val.num_mips_levels,
+            text_mips_levels: val.num_mips_levels - val.get_text_scale() as u8,
         }
     }
 }
@@ -275,12 +260,18 @@ impl From<TextureMapHeaderV1> for TextureMapHeaderArgs {
 #[derive(Clone)]
 #[br(assert(mips_sizes == mips_sizes_dup))]
 #[br(assert(num_textures == 1))]
+#[bw(import(data_size: usize))]
 pub struct TextureMapHeaderV2 {
+    #[br(temp)]
+    #[bw(calc(1))]
     num_textures: u16,
-    #[brw(pad_after = 1)]
+
+    //#[brw(pad_after = 1)]
     type_: TextureType,
+    unk1: u8,
+
     //#[br(temp)]
-    //#[bw(calc(69))]
+    //#[bw(calc(data_size as u32))]
     file_size: u32,
     flags: RenderResourceMiscFlags,
     width: u16,
@@ -313,7 +304,7 @@ impl TextureMapHeaderV2 {
             return 0;
         }
 
-        if self.format == RenderFormat::DXT1 && self.width * self.height == 16 {
+        if self.format == RenderFormat::DXT1 && (self.width as usize * self.height as usize) == 16 {
             return 1;
         }
 
@@ -338,22 +329,15 @@ impl From<TextureMapHeaderV2> for TextureMapHeader {
             default_mip_level: val.default_mip_level,
             interpret_as: val.type_,
             dimensions: Dimensions::_2D,
-        }
-    }
-}
 
-impl From<TextureMapHeaderV2> for TextureMapHeaderArgs {
-    fn from(value: TextureMapHeaderV2) -> Self {
-        let text_scale = value.get_text_scale();
-        TextureMapHeaderArgs {
-            mips_sizes: value.mips_sizes.into_iter().filter(|x| *x != 0).collect(),
-            block_sizes: value.mips_sizes_dup.into_iter().filter(|x| *x != 0).collect(),
-            atlas_data_size: value.atlas_data_size,
-            atlas_data_offset: value.atlas_data_offset,
-            texd_width: value.width as usize,
-            texd_height: value.height as usize,
-            num_mips_levels: value.num_mips_levels,
-            text_mips_levels: value.num_mips_levels - text_scale as u8,
+            mips_sizes: val.mips_sizes.into_iter().filter(|x| *x != 0).collect(),
+            block_sizes: val.mips_sizes_dup.into_iter().filter(|x| *x != 0).collect(),
+            atlas_data_size: val.atlas_data_size,
+            atlas_data_offset: val.atlas_data_offset,
+            texd_width: val.width as usize,
+            texd_height: val.height as usize,
+            num_mips_levels: val.num_mips_levels,
+            text_mips_levels: val.num_mips_levels - text_scale as u8,
         }
     }
 }
@@ -364,16 +348,17 @@ impl From<TextureMapHeaderV2> for TextureMapHeaderArgs {
 #[br(assert(text_scaling_width == num_mips_levels - text_mips_levels))]
 #[br(assert(text_scaling_height == num_mips_levels - text_mips_levels))]
 #[br(assert(num_textures == 1))]
-#[bw(import())]
+#[bw(import(data_size: usize))]
 pub struct TextureMapHeaderV3 {
     #[br(temp)]
     #[bw(calc(1))]
     num_textures: u16,
-    #[brw(pad_after = 1)]
-    type_: TextureType,
 
-    //#[br(temp)]
-    //#[bw(calc(self.get_data_size()))]
+    type_: TextureType,
+    unk1: u8,
+
+    #[br(temp)]
+    #[bw(calc(data_size as u32))]
     data_size: u32,
     flags: RenderResourceMiscFlags,
     width: u16,
@@ -411,27 +396,20 @@ impl From<TextureMapHeaderV3> for TextureMapHeader {
             default_mip_level: val.default_mip_level,
             interpret_as: val.interpret_as,
             dimensions: val.dimensions,
+
+            mips_sizes: val.mips_sizes.into_iter().filter(|x| *x != 0).collect(),
+            block_sizes: val.block_sizes.into_iter().filter(|x| *x != 0).collect(),
+            atlas_data_size: val.atlas_data_size,
+            atlas_data_offset: val.atlas_data_offset,
+            texd_width: val.width as usize,
+            texd_height: val.height as usize,
+            num_mips_levels: val.num_mips_levels,
+            text_mips_levels: val.text_mips_levels,
         }
     }
 }
 
-impl From<TextureMapHeaderV3> for TextureMapHeaderArgs {
-    fn from(value: TextureMapHeaderV3) -> Self {
-        TextureMapHeaderArgs {
-            mips_sizes: value.mips_sizes.into_iter().filter(|x| *x != 0).collect(),
-            block_sizes: value.block_sizes.into_iter().filter(|x| *x != 0).collect(),
-            atlas_data_size: value.atlas_data_size,
-            atlas_data_offset: value.atlas_data_offset,
-            texd_width: value.width as usize,
-            texd_height: value.height as usize,
-            num_mips_levels: value.num_mips_levels,
-            text_mips_levels: value.text_mips_levels,
-        }
-    }
-}
-
-
-#[binread]
+#[binrw]
 #[derive(Debug)]
 #[br(import(woa_version: WoaVersion))]
 pub enum TextureMap {
@@ -443,22 +421,6 @@ pub enum TextureMap {
 
     #[br(pre_assert(woa_version == WoaVersion::HM3))]
     V3(TextureMapInner<TextureMapHeaderV3>),
-}
-
-impl BinWrite for TextureMap {
-    type Args<'a> = ();
-
-    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
-        match self {
-            TextureMap::V1(h) => { writer.write_type(h, Endian::Little)? }
-            TextureMap::V2(h) => { writer.write_type(h, Endian::Little)? }
-            TextureMap::V3(h) => { writer.write_type(h, Endian::Little)? }
-        }
-
-        let file_size = writer.stream_position()?;
-
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -474,6 +436,15 @@ impl BinWrite for TextureData {
         match self {
             TextureData::Tex(data) => { writer.write_type(data, endian) }
             Mipblock1(_) => { todo!() }
+        }
+    }
+}
+
+impl TextureData {
+    fn size(&self)-> usize{
+        match self{
+            TextureData::Tex(d) => {d.len()}
+            Mipblock1(d) => {d.len()}
         }
     }
 }
@@ -519,20 +490,21 @@ pub struct AtlasData {
 #[binrw]
 #[derive(Debug)]
 pub struct TextureMapInner<
-    A: for<'a> BinRead<Args<'a>=()> + for<'a> BinWrite<Args<'a>=()> + Clone
-> where TextureMapHeaderArgs: From<A> {
+    A: for<'a> BinRead<Args<'a>=()> + for<'a> BinWrite<Args<'a>=((usize,))> + Clone
+> where TextureMapHeader: From<A> {
+    #[bw(args(data.size()))]
     pub header: A,
 
     //I would like to seek_before = SeekFrom::Start(TextureMapHeaderArgs::from(header.clone()).atlas_data_offset as u64) here, but H1 and 2 have a -8 offset on the pointer
-    #[brw(if (TextureMapHeaderArgs::from(header.clone()).atlas_data_size > 0))]
-    #[br(args(TextureMapHeaderArgs::from(header.clone()).atlas_data_size))]
+    #[brw(if (TextureMapHeader::from(header.clone()).atlas_data_size > 0))]
+    #[br(args(TextureMapHeader::from(header.clone()).atlas_data_size))]
     pub atlas_data: Option<AtlasData>,
 
     #[br(parse_with = until_eof, map = TextureData::Tex)]
     pub data: TextureData,
 }
 
-impl<A: for<'a> BinRead<Args<'a>=()> + Clone + for<'a> binrw::BinWrite<Args<'a>=()>> TextureMapInner<A> where TextureMapHeaderArgs: From<A> {
+impl<A: for<'a> BinRead<Args<'a>=()> + Clone + for<'a> binrw::BinWrite<Args<'a>=((usize,))>> TextureMapInner<A> where TextureMapHeader: From<A> {
     pub fn get_data(&self) -> &Vec<u8> {
         match &self.data {
             TextureData::Tex(d) => { d }
@@ -554,6 +526,15 @@ impl<A: for<'a> BinRead<Args<'a>=()> + Clone + for<'a> binrw::BinWrite<Args<'a>=
 
 
 impl TextureMap {
+
+    pub fn get_that_one_thing(&self) -> u8{
+        match self{
+            TextureMap::V1(_) => {0}
+            TextureMap::V2(h) => {h.header.unk1}
+            TextureMap::V3(h) => {h.header.unk1}
+        }
+    }
+
     pub fn get_header(&self) -> TextureMapHeader {
         match self {
             TextureMap::V1(t) => { t.header.clone().into() }
@@ -571,7 +552,7 @@ impl TextureMap {
     }
 
     //TODO: Private this
-    pub fn get_header_args(&self) -> TextureMapHeaderArgs {
+    pub fn get_header_args(&self) -> TextureMapHeader {
         match self {
             TextureMap::V1(t) => { t.header.clone().into() }
             TextureMap::V2(t) => { t.header.clone().into() }

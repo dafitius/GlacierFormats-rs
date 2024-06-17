@@ -4,9 +4,6 @@ use binrw::{binread, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
 use crate::math::Vector4;
 use crate::render_primitive::{align_writer, PrimPropertyFlags};
 
-#[cfg(feature = "serde")]
-use serde::{Serialize};
-
 use crate::prim_mesh::PrimMesh;
 use crate::prim_object::PrimObject;
 use crate::prim_sub_mesh::PrimSubMesh;
@@ -14,7 +11,6 @@ use crate::prim_sub_mesh::PrimSubMesh;
 #[binread]
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[br(import(global_properties: PrimPropertyFlags))]
 pub struct PrimMeshWeighted
 {
@@ -98,7 +94,6 @@ impl BinWrite for PrimMeshWeighted {
 
 #[binread]
 #[derive(Debug, BinWrite, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[br(import{count: u32})]
 pub struct CopyBones
 {
@@ -117,7 +112,6 @@ impl CopyBones {
 
 #[binread]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct BoneIndices
 {
     #[br(temp)]
@@ -141,7 +135,6 @@ impl BinWrite for BoneIndices {
 
 #[binread]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[br(import{global_properties: PrimPropertyFlags, num_copy_bones: u32})]
 pub struct BoneInfo
 {
@@ -193,7 +186,6 @@ impl BinWrite for BoneInfo{
 
 #[binread]
 #[derive(Debug, BinWrite, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct BoneAccel
 {
     pub offset: u32,

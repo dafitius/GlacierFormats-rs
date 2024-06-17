@@ -4,14 +4,11 @@ use std::io::{Read, Seek, Write};
 use std::ops::Index;
 use binrw::{binread, BinResult, BinWrite, BinWriterExt, Endian};
 
-#[cfg(feature = "serde")]
-use serde::{Serialize};
 use crate::math::Vector3;
 
 
 #[binread]
 #[derive(BinWrite, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[br(import{
 cloth_id: u8,
 num_vertices: u32})]
@@ -28,7 +25,6 @@ pub enum ClothData {
 
 #[binread]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ClothPack {
     #[br(temp)]
     pub header: PackHeader,
@@ -52,7 +48,6 @@ impl BinWrite for ClothPack {
 }
 
 #[derive(BinRead, BinWrite, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ClothSkinning
 {
     pub indices: [u16; 4],
@@ -62,7 +57,6 @@ pub struct ClothSkinning
 }
 
 #[derive(BinRead, BinWrite, Debug, PartialEq, Default, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct PackHeader
 {
     pub(crate) data_size: u32,
@@ -72,7 +66,6 @@ pub struct PackHeader
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct GridPoint
 {
     pub down: Option<u16>,
@@ -86,7 +79,6 @@ pub struct GridPoint
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u32)]
 enum Neighbor { Down, DownRight, Right, UpRight, Up, UpLeft, Left, DownLeft }
 

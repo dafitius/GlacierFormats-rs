@@ -14,11 +14,11 @@ impl GlacierResource for RenderPrimitive {
         todo!()
     }
 
-    fn get_video_memory_requirement(resource: &Self::Output) -> u64 {
+    fn video_memory_requirement(resource: &Self::Output) -> u64 {
         todo!()
     }
 
-    fn get_system_memory_requirement(resource: &Self::Output) -> u64 {
+    fn system_memory_requirement(resource: &Self::Output) -> u64 {
         todo!()
     }
 }

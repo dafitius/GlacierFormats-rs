@@ -58,7 +58,6 @@ pub fn create_dds(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
     let blob = directxtex::save_dds(images.as_slice(), &meta_data, DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT).map_err(DirectXTexError)?;
     Ok(Vec::from(blob.buffer()))
 }
-
 pub fn create_tga(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
     let dds = create_dds(tex)?;
     let mut scratch_image = ScratchImage::load_dds(dds.as_slice(), DDS_FLAGS::DDS_FLAGS_NONE, None, None).map_err(DirectXTexError)?;
@@ -93,8 +92,6 @@ pub fn create_tga(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
     let blob = scratch_image.image(0, 0, 0).unwrap().save_tga(TGA_FLAGS::TGA_FLAGS_NONE, None).map_err(DirectXTexError)?;
     Ok(Vec::from(blob.buffer()))
 }
-
-
 pub fn create_mip_dds(tex: &TextureMap, mip_level: usize) -> Result<Vec<u8>, TextureConversionError> {
     let header = tex.get_header();
     if let Ok(mut mip) = tex.get_mip_level(mip_level) {

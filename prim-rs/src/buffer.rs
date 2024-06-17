@@ -1,8 +1,6 @@
 
 use std::io::{Read, Seek, Write};
 use std::marker::PhantomData;
-use base64::Engine;
-use base64::engine::general_purpose;
 use bincode::Encode;
 use binrw::{BinRead, BinResult, BinWrite, BinWriterExt, Endian};
 use num_traits::Bounded;
@@ -11,10 +9,6 @@ use crate::math::{Color, Vector2, Vector4};
 use crate::render_primitive::{PrimPropertyFlags};
 use crate::prim_object::ObjectPropertyFlags;
 
-#[cfg(feature = "serde")]
-use serde::{Serialize, Serializer};
-#[cfg(feature = "serde")]
-use serde::ser::SerializeStruct;
 use crate::prim_mesh::PrimMesh;
 
 
@@ -112,26 +106,7 @@ impl BinWrite for VertexBuffers {
     }
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for VertexBuffers {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let mut buffers = serializer.serialize_struct("VertexBuffers", 3)?;
-
-        let pos_bytes = bincode::encode_to_vec(&self.position, bincode::config::standard()).map_err(serde::ser::Error::custom)?;
-        let pos_encoded = general_purpose::STANDARD.encode(pos_bytes);
-
-        buffers.serialize_field("position", &pos_encoded)?;
-
-        let main_bytes = bincode::encode_to_vec(&self.main, bincode::config::standard()).map_err(serde::ser::Error::custom)?;
-        let main_encoded = general_purpose::STANDARD.encode(main_bytes);
-
-        buffers.serialize_field("main", &main_encoded)?;
-        buffers.end()
-    }
-}
-
 pub type IndexBuffer = Vec<u16>;
-
 
 #[derive(Debug, Default)]
 pub struct QuantizedVector2<T> where

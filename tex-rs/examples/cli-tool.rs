@@ -1,15 +1,11 @@
 use std::{fs};
-use std::fs::File;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use binrw::BinRead;
 use clap::{Args, Parser, Subcommand};
-use directxtex::{Blob, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, Image, ScratchImage, TEX_FILTER_FLAGS, TexMetadata, TGA_FLAGS};
-use tex_rs::texture_map::{MipLevel, RenderFormat, TextureMap};
-use tex_rs::texture_map::RenderFormat::{BC5, R16G16B16A16, R8G8, R8G8B8A8};
+use tex_rs::texture_map::{TextureMap};
 use tex_rs::WoaVersion;
-use tex_rs::WoaVersion::HM3;
 use tex_rs::convert;
 
 #[derive(Parser, Debug)]

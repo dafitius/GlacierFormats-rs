@@ -27,24 +27,24 @@ impl GlacierResource for TextureMap {
         todo!()
     }
 
-    fn get_video_memory_requirement(resource: &Self::Output) -> u64 {
+    fn video_memory_requirement(resource: &Self::Output) -> u64 {
         todo!()
     }
 
-    fn get_system_memory_requirement(resource: &Self::Output) -> u64 {
+    fn system_memory_requirement(resource: &Self::Output) -> u64 {
         todo!()
     }
 }
 
-pub fn get_full_texture(manager: &rpkg_rs::runtime::resource::partition_manager::PartitionManager, woa_version: rpkg_rs::WoaVersion, rrid: rpkg_rs::runtime::resource::runtime_resource_id::RuntimeResourceID) -> Result<TextureMap, GlacierResourceError> {
-    let res_info = manager.get_resource_info_from(&"chunk0".parse().unwrap(), &rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
-    let data = manager.get_resource_from("chunk0".parse().unwrap(), rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionManager, woa_version: rpkg_rs::WoaVersion, rrid: rpkg_rs::resource::runtime_resource_id::RuntimeResourceID) -> Result<TextureMap, GlacierResourceError> {
+    let res_info = manager.resource_info_from(&"chunk0".parse().unwrap(), &rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+    let data = manager.read_resource_from("chunk0".parse().unwrap(), rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
 
     let mut stream = Cursor::new(data);
     let mut texture_map = TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
 
-    if let Some((rrid, flag)) = res_info.get_reference(0){
-        let texd_data = manager.get_resource_from("chunk0".parse().unwrap(), *rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+    if let Some((rrid, flag)) = res_info.references().get(0){
+        let texd_data = manager.read_resource_from("chunk0".parse().unwrap(), *rrid).map_err(|e| GlacierResourceError::ReadError(format!("Tried to load broken depend: {}", e)))?;
         texture_map.set_mipblock1_data(&texd_data, WoaVersion::from(woa_version)).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
     }
     Ok(texture_map)

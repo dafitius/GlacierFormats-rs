@@ -3,15 +3,9 @@ use modular_bitfield::bitfield;
 use crate::math::{BoundingBox, Vector3};
 use crate::render_primitive::PrimHeader;
 
-#[cfg(feature = "serde")]
-use serde::{Serialize, Serializer};
-#[cfg(feature = "serde")]
-use serde::ser::SerializeStruct;
-
 #[binrw]
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[bw(import(bb: BoundingBox<Vector3>))]
 pub struct PrimObject
 {
@@ -37,7 +31,6 @@ pub struct PrimObject
 
 #[allow(dead_code)]
 #[derive(BinRead, BinWrite, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[brw(little, repr = u8)]
 pub enum PrimObjectSubtype
 {
@@ -65,18 +58,4 @@ pub struct ObjectPropertyFlags
     pub is_no_physics_prop: bool,
     #[skip]
     __: bool,
-}
-
-#[cfg(feature = "serde")]
-impl Serialize for ObjectPropertyFlags {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let mut s = serializer.serialize_struct("PrimPropertyFlags", 6)?;
-        s.serialize_field("x_axis_locked", &self.x_axis_locked())?;
-        s.serialize_field("y_axis_locked", &self.y_axis_locked())?;
-        s.serialize_field("z_axis_locked", &self.z_axis_locked())?;
-        s.serialize_field("has_highres_positions", &self.has_highres_positions())?;
-        s.serialize_field("has_constant_color", &self.has_constant_color())?;
-        s.serialize_field("is_no_physics_prop", &self.is_no_physics_prop())?;
-        s.end()
-    }
 }

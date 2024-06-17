@@ -9,12 +9,6 @@ use modular_bitfield::prelude::*;
 use crate::math::{BoundingBox, Vector3};
 use crate::prim_mesh_weighted::PrimMeshWeighted;
 
-#[cfg(feature = "serde")]
-use serde::{Serialize, Serializer};
-#[cfg(feature = "serde")]
-use serde::ser::SerializeMap;
-#[cfg(feature = "serde")]
-use serde::ser::SerializeStruct;
 use crate::prim_mesh::PrimMesh;
 
 #[binread]
@@ -64,26 +58,9 @@ impl BinWrite for RenderPrimitive {
     }
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for RenderPrimitive {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        //let mut root = serializer.serialize_struct("RenderPrimitve", 3)?;
-
-        let mut header = serializer.serialize_map(None)?;
-        header.serialize_entry("property_flags", &self.data.property_flags)?;
-        header.serialize_entry("bone_rig_resource_index", &self.data.bone_rig_resource_index)?;
-        header.end()
-
-        // root.serialize_field("ObjectHeader", &header)?;
-        //
-        // root.end()
-    }
-}
-
 #[binread]
 #[allow(dead_code, unused_variables)]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct PrimObjectHeader
 {
     pub prims: PrimHeader,
@@ -148,7 +125,6 @@ impl BinWrite for PrimObjectHeader {
 }
 
 #[derive(BinRead, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[br(import(global_properties: PrimPropertyFlags))]
 pub enum MeshObject {
     #[br(pre_assert(!global_properties.is_weighted_object() && !global_properties.is_linked_object()))]
@@ -200,23 +176,8 @@ pub struct PrimPropertyFlags
     __: B22,
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for PrimPropertyFlags {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let mut s = serializer.serialize_struct("PrimPropertyFlags", 6)?;
-        s.serialize_field("has_bones", &self.has_bones())?;
-        s.serialize_field("has_frames", &self.has_frames())?;
-        s.serialize_field("is_linked_object", &self.is_linked_object())?;
-        s.serialize_field("is_weighted_object", &self.is_weighted_object())?;
-        s.serialize_field("use_bounds", &self.use_bounds())?;
-        s.serialize_field("has_highres_positions", &self.has_highres_positions())?;
-        s.end()
-    }
-}
-
 #[allow(dead_code)]
 #[derive(BinRead, BinWrite, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct PrimHeader
 {
     #[brw(pad_before(2))]
@@ -225,7 +186,6 @@ pub struct PrimHeader
 
 #[allow(dead_code)]
 #[derive(BinRead, BinWrite, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[brw(little, repr = u16)]
 pub enum PrimType
 {

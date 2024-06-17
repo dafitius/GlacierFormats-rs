@@ -9,13 +9,10 @@ use crate::render_primitive::{align_writer, PrimPropertyFlags};
 use crate::buffer;
 use crate::buffer::{IndexBuffer, VertexBuffers};
 
-#[cfg(feature = "serde")]
-use serde::{Serialize};
 
 #[binread]
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[br(import{
 global_properties: PrimPropertyFlags,
 mesh_properties: ObjectPropertyFlags,
