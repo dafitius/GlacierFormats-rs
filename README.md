@@ -10,7 +10,7 @@ The crates in this workspace facilitate reading and writing of these formats.
 ## Features
 
 #### Supported File Formats:
-- RenderPrimitive ([PRIM](prim-rs)) files, containing mesh, hitbox and cloth data.
+- RenderPrimitive ([PRIM](prim-rs)) files, containing mesh, hitbox and cloth data. [experimental]
 - TextureMap and MipblockData ([TEXT and TEXD](tex-rs)) files, containg texture data.
 
 #### Optional rpkg-rs support
