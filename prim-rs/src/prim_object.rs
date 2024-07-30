@@ -1,5 +1,5 @@
 use binrw::{BinRead, binrw, BinWrite};
-use modular_bitfield::bitfield;
+use bitfield_struct::bitfield;
 use crate::math::{BoundingBox, Vector3};
 use crate::render_primitive::PrimHeader;
 
@@ -44,18 +44,16 @@ pub enum PrimObjectSubtype
 }
 
 #[allow(redundant_semicolons)]
-#[bitfield(bytes = 1)]
-#[derive(BinRead, BinWrite, Debug, Clone, Copy, PartialEq)]
+#[bitfield(u8)]
+#[derive(BinRead, BinWrite, PartialEq)]
 pub struct ObjectPropertyFlags
 {
     pub x_axis_locked: bool,
     pub y_axis_locked: bool,
     pub z_axis_locked: bool,
     pub has_highres_positions: bool,
-    #[skip]
     __: bool,
     pub has_constant_color: bool,
     pub is_no_physics_prop: bool,
-    #[skip]
     __: bool,
 }

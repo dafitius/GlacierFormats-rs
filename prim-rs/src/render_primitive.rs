@@ -4,8 +4,7 @@ use std::io::{Cursor, Read, Seek, Write};
 use std::path::{Path};
 use binrw::{BinRead, binread, BinReaderExt, BinResult, BinWrite, BinWriterExt, Endian, FilePtr64};
 use binrw::io::SeekFrom;
-use modular_bitfield::bitfield;
-use modular_bitfield::prelude::*;
+use bitfield_struct::bitfield;
 use crate::math::{BoundingBox, Vector3};
 use crate::prim_mesh_weighted::PrimMeshWeighted;
 
@@ -158,22 +157,21 @@ impl BinWrite for MeshObject {
 }
 
 #[allow(redundant_semicolons)]
-#[bitfield(bytes = 4)]
+#[bitfield(u32)]
 #[derive(Eq, Hash, PartialEq)]
-#[derive(BinRead, BinWrite, Debug, Clone, Copy)]
-#[br(map = Self::from_bytes)]
+#[derive(BinRead, BinWrite)]
 pub struct PrimPropertyFlags
 {
     pub has_bones: bool,
     pub has_frames: bool,
     pub is_linked_object: bool,
     pub is_weighted_object: bool,
-    #[skip]
-    __: B4,
+    #[bits(4)]
+    __: u8,
     pub use_bounds: bool,
     pub has_highres_positions: bool,
-    #[skip]
-    __: B22,
+    #[bits(22)]
+    __: usize,
 }
 
 #[allow(dead_code)]
