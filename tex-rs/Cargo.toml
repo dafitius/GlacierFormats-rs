@@ -7,14 +7,13 @@ edition = "2021"
 [dependencies]
 directxtex = "1.0.0"
 binrw = "0.14.0"
-bitfield-struct = "0.7.0"
-lz4 = "1.24.0"
-thiserror = "1.0.57"
-clap = { version = "4.5.3", features = ["derive"] }
+bitfield-struct = "0.8.0"
+lz4 = "1.26.0"
+thiserror = "1.0.63"
 rpkg-rs = { version = "1.0.0-rc.1", optional = true }
 
 [dev-dependencies]
-clap = "4.5.3"
+clap = "4.5.11"
 walkdir = "2.5.0"
 
 [features]
