@@ -8,7 +8,7 @@ use crate::prim_sub_mesh::PrimSubMesh;
 
 #[binread]
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[br(import(global_properties: PrimPropertyFlags))]
 pub struct PrimMesh
 {

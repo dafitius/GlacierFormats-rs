@@ -5,7 +5,7 @@ use crate::render_primitive::PrimHeader;
 
 #[binrw]
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[bw(import(bb: BoundingBox<Vector3>))]
 pub struct PrimObject
 {
@@ -30,7 +30,7 @@ pub struct PrimObject
 }
 
 #[allow(dead_code)]
-#[derive(BinRead, BinWrite, Debug, PartialEq)]
+#[derive(BinRead, BinWrite, Debug, PartialEq, Clone, Copy)]
 #[brw(little, repr = u8)]
 pub enum PrimObjectSubtype
 {

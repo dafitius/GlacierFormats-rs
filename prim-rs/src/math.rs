@@ -188,7 +188,7 @@ impl Default for Color {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoundingBox<V> {
     pub min: V,
     pub max: V,

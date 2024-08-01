@@ -4,7 +4,7 @@ use crate::math::{BoundingBox, Vector3};
 use crate::render_primitive::align_writer;
 
 #[binread]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoxColi {
     #[br(temp)]
     pub num_chunks: u16,

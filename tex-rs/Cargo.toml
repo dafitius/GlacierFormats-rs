@@ -13,7 +13,7 @@ thiserror = "1.0.63"
 rpkg-rs = { version = "1.0.0-rc.1", optional = true }
 
 [dev-dependencies]
-clap = "4.5.11"
+clap = { version = "4.5.11", features = ["derive"] }
 walkdir = "2.5.0"
 
 [features]

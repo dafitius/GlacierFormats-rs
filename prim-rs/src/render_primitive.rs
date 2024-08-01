@@ -11,7 +11,7 @@ use crate::prim_mesh_weighted::PrimMeshWeighted;
 use crate::prim_mesh::PrimMesh;
 
 #[binread]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[brw(little)]
 pub struct RenderPrimitive {
     #[br(parse_with = FilePtr64::parse)]
@@ -59,7 +59,7 @@ impl BinWrite for RenderPrimitive {
 
 #[binread]
 #[allow(dead_code, unused_variables)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PrimObjectHeader
 {
     pub prims: PrimHeader,
@@ -123,7 +123,7 @@ impl BinWrite for PrimObjectHeader {
     }
 }
 
-#[derive(BinRead, Debug, PartialEq)]
+#[derive(BinRead, Debug, PartialEq, Clone)]
 #[br(import(global_properties: PrimPropertyFlags))]
 pub enum MeshObject {
     #[br(pre_assert(!global_properties.is_weighted_object() && !global_properties.is_linked_object()))]
@@ -175,7 +175,7 @@ pub struct PrimPropertyFlags
 }
 
 #[allow(dead_code)]
-#[derive(BinRead, BinWrite, Debug, PartialEq)]
+#[derive(BinRead, BinWrite, Debug, PartialEq, Clone, Copy)]
 pub struct PrimHeader
 {
     #[brw(pad_before(2))]
@@ -183,7 +183,7 @@ pub struct PrimHeader
 }
 
 #[allow(dead_code)]
-#[derive(BinRead, BinWrite, Debug, PartialEq)]
+#[derive(BinRead, BinWrite, Debug, PartialEq, Clone, Copy)]
 #[brw(little, repr = u16)]
 pub enum PrimType
 {

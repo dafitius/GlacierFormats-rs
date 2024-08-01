@@ -15,7 +15,7 @@ use crate::prim_mesh::PrimMesh;
 pub type VertexPos = Vector4;
 pub type VertexColor = Color;
 
-#[derive(Debug, PartialEq, Encode)]
+#[derive(Debug, PartialEq, Clone, Encode)]
 pub struct VertexMain
 {
     pub normal: Vector4,
@@ -24,14 +24,14 @@ pub struct VertexMain
     pub uvs: Vec<Vector2>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct VertexWeights
 {
     pub weight: (Vector4, Vector2),
     pub joint: (Vector4, Vector2),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct VertexBuffers {
     pub position: Vec<VertexPos>,
     pub weights: Option<Vec<VertexWeights>>,

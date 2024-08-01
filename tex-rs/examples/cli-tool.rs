@@ -1,5 +1,5 @@
 use std::{fs};
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use binrw::BinRead;

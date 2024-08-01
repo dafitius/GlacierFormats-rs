@@ -10,7 +10,7 @@ use crate::prim_sub_mesh::PrimSubMesh;
 
 #[binread]
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[br(import(global_properties: PrimPropertyFlags))]
 pub struct PrimMeshWeighted
 {
@@ -93,7 +93,7 @@ impl BinWrite for PrimMeshWeighted {
 
 
 #[binread]
-#[derive(Debug, BinWrite, Default, PartialEq)]
+#[derive(Debug, BinWrite, Default, PartialEq, Clone)]
 #[br(import{count: u32})]
 pub struct CopyBones
 {
@@ -111,7 +111,7 @@ impl CopyBones {
 }
 
 #[binread]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoneIndices
 {
     #[br(temp)]
@@ -134,7 +134,7 @@ impl BinWrite for BoneIndices {
 }
 
 #[binread]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[br(import{global_properties: PrimPropertyFlags, num_copy_bones: u32})]
 pub struct BoneInfo
 {
@@ -185,7 +185,7 @@ impl BinWrite for BoneInfo{
 }
 
 #[binread]
-#[derive(Debug, BinWrite, PartialEq)]
+#[derive(Debug, BinWrite, PartialEq, Clone)]
 pub struct BoneAccel
 {
     pub offset: u32,

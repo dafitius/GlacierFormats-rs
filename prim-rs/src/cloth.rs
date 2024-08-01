@@ -8,7 +8,7 @@ use crate::math::Vector3;
 
 
 #[binread]
-#[derive(BinWrite, Debug, PartialEq)]
+#[derive(BinWrite, Debug, PartialEq, Clone)]
 #[br(import{
 cloth_id: u8,
 num_vertices: u32})]
@@ -24,7 +24,7 @@ pub enum ClothData {
 }
 
 #[binread]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ClothPack {
     #[br(temp)]
     pub header: PackHeader,
@@ -47,7 +47,7 @@ impl BinWrite for ClothPack {
     }
 }
 
-#[derive(BinRead, BinWrite, Debug, PartialEq)]
+#[derive(BinRead, BinWrite, Debug, PartialEq, Clone)]
 pub struct ClothSkinning
 {
     pub indices: [u16; 4],
@@ -65,7 +65,7 @@ pub struct PackHeader
     pub(crate) grid_size: u32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GridPoint
 {
     pub down: Option<u16>,

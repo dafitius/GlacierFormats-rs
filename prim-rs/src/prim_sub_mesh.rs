@@ -12,7 +12,7 @@ use crate::buffer::{IndexBuffer, VertexBuffers};
 
 #[binread]
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[br(import{
 global_properties: PrimPropertyFlags,
 mesh_properties: ObjectPropertyFlags,
