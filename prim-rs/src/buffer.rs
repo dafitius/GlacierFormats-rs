@@ -306,7 +306,12 @@ pub fn parse_vertices(num_vertices: u32,
         let tangent = QuantizedVector4::<u8>::read_options(reader, endian, args)?;
         let bitangent = QuantizedVector4::<u8>::read_options(reader, endian, args)?;
 
-        for _ in 0..num_uv_channels {
+        let uv_count = match num_uv_channels{
+            0 if is_weighted => 1,
+            x => x
+        };
+
+        for _ in 0..uv_count {
             uvs.push(
                 QuantizedVector2::<i16>::read_options(reader, endian, tex_scale_bias)?
             )

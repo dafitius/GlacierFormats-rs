@@ -19,8 +19,9 @@ pub enum ClothData {
         Vec<ClothSkinning>
     ),
 
-    #[br(pre_assert(cloth_id & 0x80 == 0x80 && true == false))] //disabled, is unstable
-    Packed(ClothPack),
+    #[br(pre_assert(cloth_id & 0x80 == 0x80))] //disabled, is unstable
+    // Packed(ClothPack),
+    Packed,
 }
 
 #[binread]
