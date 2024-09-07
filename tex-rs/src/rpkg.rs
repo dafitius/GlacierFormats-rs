@@ -23,15 +23,23 @@ impl GlacierResource for TextureMap {
         TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
-    fn serialize(resource: &Self::Output, woa_version: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
+    fn serialize(&self, woa_version: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
         todo!()
     }
 
-    fn video_memory_requirement(resource: &Self::Output) -> u64 {
+    fn resource_type(&self) -> [u8; 4] {
         todo!()
     }
 
-    fn system_memory_requirement(resource: &Self::Output) -> u64 {
+    fn video_memory_requirement(&self) -> u64 {
+        todo!()
+    }
+
+    fn system_memory_requirement(&self) -> u64 {
+        todo!()
+    }
+
+    fn should_scramble(&self) -> bool {
         todo!()
     }
 }

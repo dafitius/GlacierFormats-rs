@@ -1,5 +1,5 @@
 use std::io::Cursor;
-use rpkg_rs::{GlacierResource, GlacierResourceError};
+use rpkg_rs::{GlacierResource, GlacierResourceError, WoaVersion};
 use crate::render_primitive::RenderPrimitive;
 
 impl GlacierResource for RenderPrimitive {
@@ -10,15 +10,23 @@ impl GlacierResource for RenderPrimitive {
         RenderPrimitive::parse_bytes(&mut stream).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
-    fn serialize(resource: &Self::Output, woa_version: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
+    fn serialize(&self, woa_version: WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
         todo!()
     }
 
-    fn video_memory_requirement(resource: &Self::Output) -> u64 {
+    fn resource_type(&self) -> [u8; 4] {
         todo!()
     }
 
-    fn system_memory_requirement(resource: &Self::Output) -> u64 {
+    fn video_memory_requirement(&self) -> u64 {
+        todo!()
+    }
+
+    fn system_memory_requirement(&self) -> u64 {
+        todo!()
+    }
+
+    fn should_scramble(&self) -> bool {
         todo!()
     }
 }
