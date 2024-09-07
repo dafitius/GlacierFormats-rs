@@ -1,12 +1,12 @@
 pub mod render_primitive;
-mod prim_mesh_weighted;
+pub mod prim_mesh_weighted;
 pub mod math;
-mod buffer;
-mod prim_object;
-mod prim_mesh;
-mod prim_sub_mesh;
-mod collision;
-mod cloth;
+pub mod buffer;
+pub mod prim_object;
+pub mod prim_mesh;
+pub mod prim_sub_mesh;
+pub mod collision;
+pub mod cloth;
 
 #[cfg(feature = "rpkg")]
 pub mod rpkg;

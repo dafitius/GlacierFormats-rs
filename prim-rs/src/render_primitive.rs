@@ -143,6 +143,16 @@ pub enum MeshObject {
     ),
 }
 
+impl MeshObject {
+    pub fn prim_mesh(&self) -> &PrimMesh {
+        match self {
+            MeshObject::Normal(prim_mesh) => prim_mesh,
+            MeshObject::Weighted(prim_mesh_weighted) => &prim_mesh_weighted.prim_mesh,
+            MeshObject::Linked(prim_mesh_weighted) => &prim_mesh_weighted.prim_mesh,
+        }
+    }
+}
+
 impl BinWrite for MeshObject {
     type Args<'a> = (&'a PrimPropertyFlags, &'a mut u32);
 
