@@ -5,6 +5,8 @@ pub mod texture_map;
 #[cfg(feature = "rpkg")]
 pub mod rpkg;
 pub mod convert;
+pub mod pack;
+pub mod enums;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum WoaVersion {
