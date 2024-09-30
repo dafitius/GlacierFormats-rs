@@ -7,7 +7,7 @@ use directxtex::{DXGI_FORMAT, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOL
 use lz4::block::CompressionMode;
 use thiserror::Error;
 use crate::enums::RenderFormat::BC4;
-use crate::texture_map::{AtlasData, TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3, TextureMapInner};
+use crate::texture_map::{AtlasData, MipblockData, TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3, TextureMapInner};
 use crate::pack::TexturePackerError::{DirectXTexError, PackingError};
 use crate::WoaVersion;
 
@@ -229,6 +229,10 @@ impl TextureMapBuilder {
 
     /// Final build method to create a TextureMap.
     pub fn build(self) -> Result<TextureMap, TexturePackerError> {
+        let mipblock = MipblockData{
+            header: vec![],
+            data: self.data,
+        };
         let texture_map_inner = match self.woa_version {
             WoaVersion::HM2016 => {
                 let header = TextureMapHeaderV1 {
@@ -248,7 +252,7 @@ impl TextureMapBuilder {
                 TextureMapInner {
                     header,
                     atlas_data: self.atlas_data,
-                    data: TextureData::Mipblock1(self.data),
+                    data: TextureData::Mipblock1(mipblock),
                 }
                     .into()
             }
@@ -269,7 +273,7 @@ impl TextureMapBuilder {
                 TextureMapInner {
                     header,
                     atlas_data: self.atlas_data,
-                    data: TextureData::Mipblock1(self.data),
+                    data: TextureData::Mipblock1(mipblock),
                 }
                     .into()
             }
@@ -291,7 +295,7 @@ impl TextureMapBuilder {
                 TextureMapInner {
                     header,
                     atlas_data: self.atlas_data,
-                    data: TextureData::Mipblock1(self.data),
+                    data: TextureData::Mipblock1(mipblock),
                 }
                     .into()
             }

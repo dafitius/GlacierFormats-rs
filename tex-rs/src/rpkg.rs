@@ -1,7 +1,8 @@
 use std::io::Cursor;
-use binrw::BinRead;
+use binrw::{BinRead, BinWrite};
 use rpkg_rs::{GlacierResource, GlacierResourceError};
-use crate::texture_map::TextureMap;
+use crate::pack::TexturePackerError;
+use crate::texture_map::{MipblockData, TextureMap};
 use crate::WoaVersion;
 
 
@@ -33,12 +34,48 @@ impl GlacierResource for TextureMap {
         TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
-    fn serialize(&self, woa_version: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
-        todo!()
+    fn serialize(&self, _: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
+        //TODO: woa version gets ignored currently. Getting the packer to accept TextureMap would allow for easy porting.
+        let mut writer = Cursor::new(Vec::new());
+        self.write_le_args(&mut writer, ())
+            .map_err(TexturePackerError::SerializationError).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?; //TODO: change this
+        Ok(writer.into_inner())
     }
 
     fn resource_type(&self) -> [u8; 4] {
-        todo!()
+        *b"TEXT"
+    }
+
+    fn video_memory_requirement(&self) -> u64 {
+        self.max_video_memory_size() as u64
+    }
+
+    fn system_memory_requirement(&self) -> u64 {
+        0xFFFFFFFF
+    }
+
+    fn should_scramble(&self) -> bool {
+        true
+    }
+}
+
+impl GlacierResource for MipblockData{
+    type Output = MipblockData;
+
+    fn process_data<R: AsRef<[u8]>>(woa_version: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
+        let mipblock = MipblockData::new(&data.as_ref().to_vec(), woa_version.into()).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+        Ok(mipblock)
+    }
+
+    fn serialize(&self, woa_version: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
+        if self.header.is_empty() && (woa_version == rpkg_rs::WoaVersion::HM2016 || woa_version == rpkg_rs::WoaVersion::HM2) {
+            return Err(GlacierResourceError::ReadError(format!("Cannot serialize to {:?} without header data :(", woa_version)));
+        }
+        return Ok(self.header.iter().chain(&self.data).cloned().collect())
+    }
+
+    fn resource_type(&self) -> [u8; 4] {
+        *b"TEXD"
     }
 
     fn video_memory_requirement(&self) -> u64 {
@@ -46,11 +83,11 @@ impl GlacierResource for TextureMap {
     }
 
     fn system_memory_requirement(&self) -> u64 {
-        todo!()
+        0xFFFFFFFF
     }
 
     fn should_scramble(&self) -> bool {
-        todo!()
+        false
     }
 }
 

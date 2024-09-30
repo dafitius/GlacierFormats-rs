@@ -5,7 +5,6 @@ use binrw::helpers::until_eof;
 use serde::{Deserialize, Serialize};
 use crate::enums::*;
 use crate::WoaVersion;
-use crate::texture_map::TextureData::Mipblock1;
 
 const MAX_MIP_LEVELS: usize = 0xE;
 
@@ -54,7 +53,7 @@ pub struct TextureMapHeaderV1 {
     pub(crate) texd_identifier: u32,
 
     #[br(temp)]
-    #[bw(calc((args.data_size - 8)))]
+    #[bw(calc(args.data_size - 8))]
     data_size: u32,
     pub(crate) flags: RenderResourceMiscFlags,
     pub(crate) width: u16,
@@ -349,7 +348,7 @@ impl From<TextureMapInner<TextureMapHeaderV3>> for TextureMap {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum TextureData {
     Tex(Vec<u8>),
-    Mipblock1(Vec<u8>),
+    Mipblock1(MipblockData),
 }
 
 
@@ -361,7 +360,8 @@ impl BinWrite for TextureData {
             TextureData::Tex(data) => {
                 writer.write_type(data, endian)
             }
-            Mipblock1(data) => {
+            TextureData::Mipblock1(mipblock) => {
+                let data = &mipblock.data;
                 let cut_data = &data.clone().into_iter().skip(data.len() - args.0).collect::<Vec<_>>();
                 writer.write_type(cut_data, endian)
             }
@@ -373,7 +373,7 @@ impl TextureData {
     fn size(&self) -> usize {
         match self {
             TextureData::Tex(d) => { d.len() }
-            Mipblock1(d) => { d.len() }
+            TextureData::Mipblock1(d) => { d.data.len() }
         }
     }
 }
@@ -431,7 +431,7 @@ where
 {
     type Args<'a> = ();
 
-    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
+    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, _: Self::Args<'_>) -> BinResult<()> {
         let atlas_size = self.atlas_data_size();
         let total_size = self.data.size()
             + A::size()
@@ -468,7 +468,7 @@ where
     pub fn get_data(&self) -> &Vec<u8> {
         match &self.data {
             TextureData::Tex(d) => { d }
-            Mipblock1(d) => { d }
+            TextureData::Mipblock1(d) => { &d.data }
         }
     }
 
@@ -483,7 +483,7 @@ where
     pub fn has_mipblock1_data(&self) -> bool {
         match &self.data {
             TextureData::Tex(_) => { false }
-            Mipblock1(_) => { true }
+            TextureData::Mipblock1(_) => { true }
         }
     }
 }
@@ -588,6 +588,11 @@ impl TextureMap {
         }
     }
 
+    pub fn max_video_memory_size(&self) -> u32 {
+        self.text_mip_levels();
+        self.mip_sizes().first().cloned().unwrap_or(0)
+    }
+
     fn text_size(&self) -> (usize, usize) {
         let (width, height) = self.texd_size();
         let scale_factor = 1 << self.text_scale();
@@ -613,7 +618,7 @@ impl TextureMap {
     pub fn dimensions(&self) -> Dimensions {
         match self {
             TextureMap::V1(tex) => { tex.header.dimensions }
-            TextureMap::V2(tex) => { Dimensions::_2D }
+            TextureMap::V2(_) => { Dimensions::_2D }
             TextureMap::V3(tex) => { tex.header.dimensions }
         }
     }
@@ -674,7 +679,75 @@ impl TextureMap {
     }
 
     pub fn set_mipblock1_data(&mut self, texd_data: &Vec<u8>, version: WoaVersion) -> Result<(), TextureMapError> {
-        let mut stream = Cursor::new(texd_data);
+        let mipblock = MipblockData::new(texd_data, version)?;
+        self.set_data(TextureData::Mipblock1(mipblock));
+        Ok(())
+    }
+
+    pub fn set_mipblock1(&mut self, mipblock: MipblockData){
+        self.set_data(TextureData::Mipblock1(mipblock))
+    }
+
+    pub fn has_atlas(&self) -> bool {
+        self.has_atlas()
+    }
+
+    pub(crate) fn texd_header(&self) -> Result<Vec<u8>, TextureMapError>{
+        let mut writer = Cursor::new(Vec::new());
+
+        let data = match self{
+            TextureMap::V1(d) => {&d.data}
+            TextureMap::V2(d) => {&d.data}
+            TextureMap::V3(d) => {&d.data}
+        };
+
+        let atlas_size = self.get_atlas_data().as_ref().map(|atlas| atlas.size()).unwrap_or(0);
+        let total_size = data.size()
+            + match self {
+            TextureMap::V1(_) => {TextureMapHeaderV1::size()}
+            TextureMap::V2(_) => {TextureMapHeaderV2::size()}
+            TextureMap::V3(_) => {TextureMapHeaderV3::size()}
+            }
+            + atlas_size;
+
+        let args = DynamicTextureMapArgs {
+            data_size: total_size as u32,
+            atlas_data_size: atlas_size as u32,
+
+            //not needed as these are only used in H3, which doesn't use a texd header.
+            text_scale: 0,
+            text_mip_levels: 0,
+        };
+        match self{
+            TextureMap::V1(tex) => {tex.header.write_options(&mut writer, Endian::Little, (args,))?}
+            TextureMap::V2(tex) => {tex.header.write_options(&mut writer, Endian::Little, (args,))?}
+            TextureMap::V3(tex) => {tex.header.write_options(&mut writer, Endian::Little, (args,))?}
+        }
+
+        // If atlas_data is present, write it
+        if let Some(atlas_data) = &self.get_atlas_data() {
+            atlas_data.write_options(&mut writer, Endian::Little, ())?;
+        }
+
+        Ok(writer.into_inner())
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MipblockData {
+    pub header: Vec<u8>,
+    pub data: Vec<u8>,
+}
+
+impl From<MipblockData> for Vec<u8> {
+    fn from(value: MipblockData) -> Self {
+        value.data
+    }
+}
+
+impl MipblockData{
+    pub fn new(data: &Vec<u8>, version: WoaVersion) -> Result<Self, TextureMapError>{
+        let mut stream = Cursor::new(data);
 
         let read_size = match version {
             WoaVersion::HM2016 => {
@@ -702,17 +775,22 @@ impl TextureMap {
                 data_size as usize - (TextureMapHeaderV2::size()) - atlas.map(|a| a.size()).unwrap_or(0)
             }
             WoaVersion::HM3 => {
-                texd_data.len()
+                data.len()
             }
         };
 
-        let mut data = vec![0u8; read_size];
-        stream.read_exact(&mut data)?;
-        self.set_data(Mipblock1(data));
-        Ok(())
+        let mut buffer = vec![0u8; read_size];
+        stream.read_exact(&mut buffer)?;
+        Ok(Self{
+            header: vec![],
+            data: buffer,
+        })
     }
 
-    pub fn has_atlas(&self) -> bool {
-        self.has_atlas()
+    pub(crate) fn insert_text_header(&mut self, texture_map: &TextureMap)
+    {
+        if let Ok(header) = texture_map.texd_header(){
+            self.header = header;
+        }
     }
 }
