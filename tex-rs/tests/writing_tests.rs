@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use binrw::{BinRead, Error};
 use directxtex::{DDS_FLAGS, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT};
-use rpkg_rs::GlacierResourceError;
+use rpkg_rs::{GlacierResource, GlacierResourceError};
 use rpkg_rs::resource::partition_manager::PartitionManager;
 use rpkg_rs::resource::pdefs::{GamePaths, PackageDefinitionSource};
 
@@ -112,24 +112,29 @@ fn write_all_text_texd_in_game(woa_version: rpkg_rs::WoaVersion, game_paths: Gam
                         texd_data = package_manager.read_resource_from(partition.partition_info().id(), texd_ref.0).map_err(|e| GlacierResourceError::ReadError(e.to_string())).unwrap();
                         texture_map.set_mipblock1_data(&texd_data, woa_version.into()).unwrap();
                     }
-                    let packer = TexturePacker::new_from_texture_map(texture_map);
+                    let packer = TexturePacker::new_from_texture_map(texture_map.clone());
                     let vec = packer.pack_to_vec().unwrap();
 
-                    total += 1;
-                    if (data != vec){
-                        bad += 1;
-                    }
-
-                    if (data != vec){
-                        fs::write(format!("./{}.TEXT",resource.rrid()), data.clone()).unwrap();
-                    }
-
                     // if (data != vec){
-                    //     fs::write("./comp1.TEXT", data.clone()).unwrap();
-                    //     fs::write("./comp2.TEXT", vec.clone()).unwrap();
-                    //     fs::write("./mipblock1.TEXD", texd_data).unwrap();
+                    //     fs::write(format!("./{}.TEXT",resource.rrid()), data.clone()).unwrap();
                     // }
+
+                    if data != vec {
+                        fs::write("./comp1.TEXT", data.clone()).unwrap();
+                        fs::write("./comp2.TEXT", vec.clone()).unwrap();
+                    }
                     // assert_eq!(data, vec);
+
+                    if !texd_data.is_empty(){
+                        let rebuilt_texd = texture_map.get_mipblock1().unwrap().serialize(woa_version).unwrap();
+                        if rebuilt_texd != texd_data {
+                            fs::write("./comp1.TEXD", rebuilt_texd.clone()).unwrap();
+                            fs::write("./comp2.TEXD", texd_data.clone()).unwrap();
+                            bad += 1;
+                        }
+                        total += 1;
+                        // assert_eq!(rebuilt_texd, texd_data);
+                    }
 
                 }
             }

@@ -589,8 +589,26 @@ impl TextureMap {
     }
 
     pub fn max_video_memory_size(&self) -> u32 {
-        self.text_mip_levels();
-        self.mip_sizes().first().cloned().unwrap_or(0)
+        match self.get_version(){
+            WoaVersion::HM2016 |
+            WoaVersion::HM2 => {
+                self.mip_sizes().get(self.text_scale()).cloned().unwrap_or(0) //The size of the largest TEXT mip
+            }
+            WoaVersion::HM3 => {
+                if self.has_mipblock1_data(){ //if texture has a TEXD
+                    self.mip_sizes().first().cloned().unwrap_or(0) //the size of the largest TEXD mip
+                } else {0}
+            }
+        }
+    }
+
+    pub fn get_mipblock1(&self) -> Option<MipblockData> {
+        self.has_mipblock1_data().then(|| {
+            self.texd_header().ok().map(|header| MipblockData {
+                header,
+                data: self.get_data().clone(),
+            })
+        }).flatten()
     }
 
     fn text_size(&self) -> (usize, usize) {
@@ -638,13 +656,12 @@ impl TextureMap {
         let mut block_sizes: Vec<u32> = self.compressed_mip_sizes();
 
         if !self.has_mipblock1_data() {
-            let removed_mip = mips_sizes.drain(0..removed_mip_count as usize).collect::<Vec<u32>>().pop().unwrap_or(0);
+            let removed_mip = mips_sizes.drain(0..removed_mip_count).collect::<Vec<u32>>().pop().unwrap_or(0);
             mips_sizes.iter_mut().for_each(|x| if *x > 0 { *x -= removed_mip });
 
-            let removed_block = block_sizes.drain(0..removed_mip_count as usize).collect::<Vec<u32>>().pop().unwrap_or(0);
+            let removed_block = block_sizes.drain(0..removed_mip_count).collect::<Vec<u32>>().pop().unwrap_or(0);
             block_sizes.iter_mut().for_each(|x| if *x > 0 { *x -= removed_block });
         }
-
 
         if level > self.texd_mip_levels() {
             return Err(TextureMapError::UnknownError("mip level is out of bounds".parse().unwrap()));
@@ -793,4 +810,17 @@ impl MipblockData{
             self.header = header;
         }
     }
+
+    pub fn data(&self, woa_version: WoaVersion) -> Vec<u8>{
+        match woa_version{
+            WoaVersion::HM2016 |
+            WoaVersion::HM2 => {
+                self.header.iter().chain(&self.data).cloned().collect()
+            }
+            WoaVersion::HM3 => {
+                self.data.clone()
+            }
+        }
+    }
+
 }
