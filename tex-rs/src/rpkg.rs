@@ -47,7 +47,7 @@ impl GlacierResource for TextureMap {
     }
 
     fn video_memory_requirement(&self) -> u64 {
-        self.max_video_memory_size() as u64
+        self.video_memory_requirement() as u64
     }
 
     fn system_memory_requirement(&self) -> u64 {
@@ -71,7 +71,7 @@ impl GlacierResource for MipblockData{
         if self.header.is_empty() && (woa_version == rpkg_rs::WoaVersion::HM2016 || woa_version == rpkg_rs::WoaVersion::HM2) {
             return Err(GlacierResourceError::ReadError(format!("Cannot serialize to {:?} without header data :(", woa_version)));
         }
-        return Ok(self.data(woa_version.into()))
+        Ok(self.data(woa_version.into()))
     }
 
     fn resource_type(&self) -> [u8; 4] {
@@ -79,7 +79,7 @@ impl GlacierResource for MipblockData{
     }
 
     fn video_memory_requirement(&self) -> u64 {
-        todo!()
+        self.video_memory_requirement() as u64
     }
 
     fn system_memory_requirement(&self) -> u64 {
@@ -98,7 +98,7 @@ pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionMan
     let mut stream = Cursor::new(data);
     let mut texture_map = TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
 
-    if let Some((rrid, flag)) = res_info.references().get(0){
+    if let Some((rrid, _)) = res_info.references().first(){
         let texd_data = manager.read_resource_from("chunk0".parse().unwrap(), *rrid).map_err(|e| GlacierResourceError::ReadError(format!("Tried to load broken depend: {}", e)))?;
         texture_map.set_mipblock1_data(&texd_data, WoaVersion::from(woa_version)).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
     }

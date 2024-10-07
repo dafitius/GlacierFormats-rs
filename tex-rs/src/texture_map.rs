@@ -1,5 +1,5 @@
 use std::io;
-use std::io::{Cursor, Read, Seek, SeekFrom, Write};
+use std::io::{Cursor, Read, Seek, Write};
 use binrw::{BinRead, binread, BinReaderExt, BinResult, binrw, BinWrite, BinWriterExt, Endian};
 use binrw::helpers::until_eof;
 use serde::{Deserialize, Serialize};
@@ -271,7 +271,7 @@ impl TextureMapHeaderImpl for TextureMapHeaderV3 {
             return 0;
         }
 
-        if self.type_ == TextureType::Billboard || self.interpret_as == InterpretAs::UNKNOWN64{
+        if self.type_ == TextureType::Billboard || self.interpret_as == InterpretAs::Volume{
             return 0;
         }
 
@@ -284,8 +284,7 @@ impl TextureMapHeaderImpl for TextureMapHeaderV3 {
         }
 
         let area = self.width as usize * self.height as usize;
-        let ret = ((area as f32).log2() * 0.5 - 6.5).floor() as usize;
-        ret
+        ((area as f32).log2() * 0.5 - 6.5).floor() as usize
     }
 
     fn size() -> usize {
@@ -496,7 +495,16 @@ pub struct MipLevel {
 }
 
 impl TextureMap {
-    pub fn get_version(&self) -> WoaVersion {
+
+    pub fn default_mip_level(&self) -> u8{
+        match self{
+            TextureMap::V1(tex) => {tex.header.default_mip_level}
+            TextureMap::V2(tex) => {tex.header.default_mip_level}
+            TextureMap::V3(tex) => {tex.header.default_mip_level}
+        }
+    }
+
+    pub fn version(&self) -> WoaVersion {
         match self {
             TextureMap::V1(_) => { WoaVersion::HM2016 }
             TextureMap::V2(_) => { WoaVersion::HM2 }
@@ -545,7 +553,7 @@ impl TextureMap {
 
     pub fn get_num_mip_levels(&self) -> usize {
         let texd_levels = self.texd_mip_levels();
-        if self.has_mipblock1_data() {
+        if self.has_mipblock1() {
             texd_levels
         } else {
             match self {
@@ -588,14 +596,14 @@ impl TextureMap {
         }
     }
 
-    pub fn max_video_memory_size(&self) -> u32 {
-        match self.get_version(){
+    pub fn video_memory_requirement(&self) -> u32 {
+        match self.version(){
             WoaVersion::HM2016 |
             WoaVersion::HM2 => {
                 self.mip_sizes().get(self.text_scale()).cloned().unwrap_or(0) //The size of the largest TEXT mip
             }
             WoaVersion::HM3 => {
-                if self.has_mipblock1_data(){ //if texture has a TEXD
+                if self.has_mipblock1(){ //if texture has a TEXD
                     self.mip_sizes().first().cloned().unwrap_or(0) //the size of the largest TEXD mip
                 } else {0}
             }
@@ -603,8 +611,9 @@ impl TextureMap {
     }
 
     pub fn get_mipblock1(&self) -> Option<MipblockData> {
-        self.has_mipblock1_data().then(|| {
+        self.has_mipblock1().then(|| {
             self.texd_header().ok().map(|header| MipblockData {
+                video_memory_requirement: self.mip_sizes().first().copied().unwrap_or(0x0) as usize,
                 header,
                 data: self.get_data().clone(),
             })
@@ -618,11 +627,11 @@ impl TextureMap {
     }
 
     pub fn width(&self) -> usize {
-        if self.has_mipblock1_data() { self.texd_size().0 } else { self.text_size().0 }
+        if self.has_mipblock1() { self.texd_size().0 } else { self.text_size().0 }
     }
 
     pub fn height(&self) -> usize {
-        if self.has_mipblock1_data() { self.texd_size().1 } else { self.text_size().1 }
+        if self.has_mipblock1() { self.texd_size().1 } else { self.text_size().1 }
     }
 
     pub fn format(&self) -> RenderFormat {
@@ -630,6 +639,30 @@ impl TextureMap {
             TextureMap::V1(tex) => { tex.header.format }
             TextureMap::V2(tex) => { tex.header.format }
             TextureMap::V3(tex) => { tex.header.format }
+        }
+    }
+
+    pub fn flags(&self) -> RenderResourceMiscFlags {
+        match self {
+            TextureMap::V1(tex) => {tex.header.flags}
+            TextureMap::V2(tex) => {tex.header.flags}
+            TextureMap::V3(tex) => {tex.header.flags}
+        }
+    }
+
+    pub fn texture_type(&self) -> TextureType {
+        match self {
+            TextureMap::V1(tex) => {tex.header.type_}
+            TextureMap::V2(tex) => {tex.header.type_}
+            TextureMap::V3(tex) => {tex.header.type_}
+        }
+    }
+
+    pub fn interpret_as(&self) -> Option<InterpretAs> {
+        match self {
+            TextureMap::V1(tex) => {Some(tex.header.interpret_as)}
+            TextureMap::V2(_) => {None}
+            TextureMap::V3(tex) => {Some(tex.header.interpret_as)}
         }
     }
 
@@ -641,7 +674,7 @@ impl TextureMap {
         }
     }
 
-    fn has_mipblock1_data(&self) -> bool {
+    pub fn has_mipblock1(&self) -> bool {
         match self {
             TextureMap::V1(t) => { t.has_mipblock1_data() }
             TextureMap::V2(t) => { t.has_mipblock1_data() }
@@ -655,7 +688,7 @@ impl TextureMap {
         let mut mips_sizes: Vec<u32> = self.mip_sizes();
         let mut block_sizes: Vec<u32> = self.compressed_mip_sizes();
 
-        if !self.has_mipblock1_data() {
+        if !self.has_mipblock1() {
             let removed_mip = mips_sizes.drain(0..removed_mip_count).collect::<Vec<u32>>().pop().unwrap_or(0);
             mips_sizes.iter_mut().for_each(|x| if *x > 0 { *x -= removed_mip });
 
@@ -706,7 +739,7 @@ impl TextureMap {
     }
 
     pub fn has_atlas(&self) -> bool {
-        self.has_atlas()
+        self.get_atlas_data().is_some()
     }
 
     pub(crate) fn texd_header(&self) -> Result<Vec<u8>, TextureMapError>{
@@ -752,6 +785,7 @@ impl TextureMap {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MipblockData {
+    pub video_memory_requirement: usize,
     pub header: Vec<u8>,
     pub data: Vec<u8>,
 }
@@ -799,17 +833,18 @@ impl MipblockData{
         let mut buffer = vec![0u8; read_size];
         stream.read_exact(&mut buffer)?;
         Ok(Self{
+            video_memory_requirement: 0,
             header: vec![],
             data: buffer,
         })
     }
 
-    pub(crate) fn insert_text_header(&mut self, texture_map: &TextureMap)
-    {
-        if let Ok(header) = texture_map.texd_header(){
-            self.header = header;
-        }
-    }
+    // pub(crate) fn insert_text_header(&mut self, texture_map: &TextureMap)
+    // {
+    //     if let Ok(header) = texture_map.texd_header(){
+    //         self.header = header;
+    //     }
+    // }
 
     pub fn data(&self, woa_version: WoaVersion) -> Vec<u8>{
         match woa_version{
@@ -823,4 +858,7 @@ impl MipblockData{
         }
     }
 
+    pub fn video_memory_requirement(&self) -> usize{
+        self.video_memory_requirement
+    }
 }

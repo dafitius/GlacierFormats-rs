@@ -15,12 +15,12 @@ pub enum TextureType
     Billboard = 4,
     Projection = 6,
     Emission = 16,
-    UNKNOWN64 = 64,
+    //UNKNOWN64 = 64, //unused
 
-    UNKNOWN128 = 128,
-    UNKNOWN256 = 256,
-    UNKNOWN512 = 512,
-    UNKNOWN1024 = 1024,
+    //UNKNOWN128 = 128, //unused in H2, H3
+    Cubemap = 256, //uses ascolormap and ascubemap
+    UNKNOWN512 = 512, //asheightmap
+    //UNKNOWN1024 = 1024, //unused
 }
 
 #[derive(BinRead, BinWrite, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Default)]
@@ -33,9 +33,9 @@ pub enum InterpretAs
     Height = 2,
     CompoundNormal = 3,
     Billboard = 4,
-    Projection = 6,
-    Emission = 16,
-    UNKNOWN64 = 64,
+    Cubemap = 6,
+    Emission = 16, //This is an assumption
+    Volume = 64, //This as well
 }
 
 
@@ -153,10 +153,10 @@ pub struct RenderResourceMiscFlags
     persistent_data: bool,
     pub texture_cube: bool,
     texture_normalmap: bool,
-    pub texture_swizzled: bool,
-    pub temp_alloc: bool,
+    pub texture_swizzled: bool, //Does not affect the texture in-game. Usually not enabled on non-normal/color types, or uncompressed formats
+    pub temp_alloc: bool,       //Only used on atlas textures
     unused2: bool,
-    pub no_color_compression: bool,
+    pub no_color_compression: bool, //stops texture from being stored compressed in memory
     has_analysis_data: bool,
     texture_srgb: bool,
     force_main_mem: bool,

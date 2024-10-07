@@ -123,7 +123,7 @@ pub fn create_mip_dds(tex: &TextureMap, mip_level: usize, decompress: bool) -> R
         };
         
         let mut blob = directxtex::save_dds(&[image], &meta_data, DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT).map_err(DirectXTexError)?;
-        if(decompress){
+        if decompress {
             let dds = ScratchImage::load_dds(blob.buffer(), DDS_FLAGS::DDS_FLAGS_NONE, None, None).map_err(DirectXTexError)?;
             let new_dds = decompress_dds(tex, dds)?;
             blob = directxtex::save_dds(new_dds.images(), new_dds.metadata(), DDS_FLAGS::DDS_FLAGS_NONE).map_err(DirectXTexError)?;

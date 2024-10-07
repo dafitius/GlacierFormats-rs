@@ -1,12 +1,12 @@
 use crate::enums::{Dimensions, InterpretAs, RenderFormat, RenderResourceMiscFlags, TextureType};
 use std::{fs, io, slice};
-use std::io::{BufReader, BufWriter, Cursor, Read, Seek, Write};
+use std::io::{BufWriter, Cursor, Read, Seek, Write};
 use std::path::Path;
+use std::ptr::NonNull;
 use binrw::BinWrite;
-use directxtex::{DXGI_FORMAT, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
+use directxtex::{DXGI_FORMAT, Image, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
 use lz4::block::CompressionMode;
 use thiserror::Error;
-use crate::enums::RenderFormat::BC4;
 use crate::texture_map::{AtlasData, MipblockData, TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3, TextureMapInner};
 use crate::pack::TexturePackerError::{DirectXTexError, PackingError};
 use crate::WoaVersion;
@@ -88,7 +88,7 @@ impl TextureMapBuilder {
         Self {
             woa_version,
             texture_type: TextureType::Colour,
-            texd_identifier: 0xFFFFFF,
+            texd_identifier: 0x4000,
             flags: RenderResourceMiscFlags::default(),
             width: 256,
             height: 256,
@@ -110,20 +110,15 @@ impl TextureMapBuilder {
         self
     }
 
-    // pub fn texd_identifier(mut self, identifier: u32) -> Self {
-    //     self.texd_identifier = identifier;
-    //     self
-    // }
-
     pub fn flags(mut self, flags: RenderResourceMiscFlags) -> Self {
         self.flags = flags;
         self
     }
 
-    // pub fn default_mip_level(mut self, level: u8) -> Self {
-    //     self.default_mip_level = level;
-    //     self
-    // }
+    pub fn with_default_mip_level(mut self, level: u8) -> Self {
+        self.default_mip_level = level;
+        self
+    }
 
     pub fn interpret_as(mut self, interpret_as: InterpretAs) -> Self {
         self.interpret_as = interpret_as;
@@ -179,7 +174,6 @@ impl TextureMapBuilder {
 
         self.format = image.metadata().format.into();
 
-
         let generated_mip_levels = image.metadata().mip_levels.clamp(0, 14) as u8;
         self.num_mip_levels = generated_mip_levels;
 
@@ -193,24 +187,25 @@ impl TextureMapBuilder {
             self.mip_sizes[i] = last + image.image(i, 0, 0).map(|img| img.slice_pitch).unwrap_or(0) as u32;
         }
 
-
         self.data = Self::serialize_mipmaps(&image, generated_mip_levels)?;
         match self.woa_version {
             WoaVersion::HM3 => {
                 let mut compressed_image_buffer = vec![];
+                let mut cursor = Cursor::new(&self.data);
                 for mip in 0..generated_mip_levels as usize {
                     if let Some(mip_image) = image.image(mip, 0, 0) {
-                        let mut cursor = Cursor::new(&self.data);
+
                         let mut mip_data = vec![0u8; mip_image.slice_pitch];
                         cursor.read(mip_data.as_mut_slice()).map_err(TexturePackerError::IoError)?;
-                        let mip_compressed = lz4::block::compress(&*mip_data, Some(CompressionMode::HIGHCOMPRESSION(12)), false).map_err(|_| PackingError(format!("Failed to compress mip level {}", mip)))?;
+                        let mip_compressed = lz4::block::compress(&mip_data, Some(CompressionMode::HIGHCOMPRESSION(12)), false).map_err(|_| PackingError(format!("Failed to compress mip level {}", mip)))?;
+                        // let mip_compressed = mip_data;
 
                         let last: u32 = mip
                             .checked_sub(1)
                             .and_then(|index| self.compressed_mip_sizes.get(index))
                             .copied()
                             .unwrap_or(0);
-                        self.compressed_mip_sizes[mip] = last + image.image(mip, 0, 0).map(|img| mip_compressed.len()).unwrap_or(0) as u32;
+                        self.compressed_mip_sizes[mip] = last + image.image(mip, 0, 0).map(|_| mip_compressed.len()).unwrap_or(0) as u32;
 
                         compressed_image_buffer.extend(mip_compressed);
                     }
@@ -223,13 +218,13 @@ impl TextureMapBuilder {
             _ => {}
         }
 
-
         Ok(self)
     }
 
     /// Final build method to create a TextureMap.
     pub fn build(self) -> Result<TextureMap, TexturePackerError> {
         let mipblock = MipblockData{
+            video_memory_requirement: self.mip_sizes.first().copied().unwrap_or(0x0) as usize,
             header: vec![],
             data: self.data,
         };
@@ -304,6 +299,15 @@ impl TextureMapBuilder {
         Ok(texture_map_inner)
     }
 
+    fn process_mip_image(mip_image: &Image) -> Option<Vec<u8>> {
+        let pixels = NonNull::new(mip_image.pixels)?;
+        let scanlines = mip_image.format.compute_scanlines(mip_image.height);
+        let buffer_size = mip_image.row_pitch.checked_mul(scanlines)?;
+        let raw_slice = unsafe { slice::from_raw_parts(pixels.as_ptr(), buffer_size) };
+        let raw_buffer = raw_slice.to_vec();
+        Some(raw_buffer)
+    }
+
     fn serialize_mipmaps(
         image: &directxtex::ScratchImage,
         mip_levels: u8,
@@ -311,11 +315,8 @@ impl TextureMapBuilder {
         let mut serialized = Vec::new();
         for mip in 0..mip_levels {
             if let Some(mip_image) = image.image(mip as usize, 0, 0) {
-                unsafe { //ffs
-                    if !mip_image.pixels.is_null() {
-                        serialized.extend_from_slice(slice::from_raw_parts_mut(mip_image.pixels, mip_image.slice_pitch));
-                    }
-                }
+                let buffer = Self::process_mip_image(mip_image).unwrap_or(vec![]);
+                serialized.extend_from_slice(buffer.as_slice());
             } else {
                 return Err(PackingError(format!(
                     "Missing mip level {}",
