@@ -57,6 +57,14 @@ impl GlacierResource for TextureMap {
     fn should_scramble(&self) -> bool {
         true
     }
+
+    fn should_compress(&self) -> bool {
+        match self.version(){
+            WoaVersion::HM2016 => {true}
+            WoaVersion::HM2 |
+            WoaVersion::HM3 => {false}
+        }
+    }
 }
 
 impl GlacierResource for MipblockData{
@@ -87,6 +95,10 @@ impl GlacierResource for MipblockData{
     }
 
     fn should_scramble(&self) -> bool {
+        false
+    }
+
+    fn should_compress(&self) -> bool {
         false
     }
 }

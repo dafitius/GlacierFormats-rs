@@ -89,7 +89,8 @@ impl TextureMapBuilder {
             woa_version,
             texture_type: TextureType::Colour,
             texd_identifier: 0x4000,
-            flags: RenderResourceMiscFlags::default(),
+            flags: RenderResourceMiscFlags::default()
+                .with_no_color_compression(true),
             width: 256,
             height: 256,
             format: RenderFormat::BC7, // Default format
@@ -110,11 +111,6 @@ impl TextureMapBuilder {
         self
     }
 
-    pub fn flags(mut self, flags: RenderResourceMiscFlags) -> Self {
-        self.flags = flags;
-        self
-    }
-
     pub fn with_default_mip_level(mut self, level: u8) -> Self {
         self.default_mip_level = level;
         self
@@ -132,6 +128,19 @@ impl TextureMapBuilder {
 
     pub fn atlas_data(mut self, atlas_data: AtlasData) -> Self {
         self.atlas_data = Some(atlas_data);
+        self.flags = self.flags.with_temp_alloc(true);
+        self
+    }
+
+    ///Setting this flag will make the game use the compressed pixels without decompressing first.
+    pub fn with_compressed_colors(mut self) -> Self {
+        self.flags = self.flags.with_no_color_compression(false);
+        self
+    }
+
+    /// Disabled until a use-case is found
+    fn with_swizzled_texture(mut self) -> Self {
+        self.flags = self.flags.with_texture_swizzled(true);
         self
     }
 
@@ -233,7 +242,7 @@ impl TextureMapBuilder {
                 let header = TextureMapHeaderV1 {
                     type_: self.texture_type,
                     texd_identifier: self.texd_identifier,
-                    flags: self.flags,
+                    flags: RenderResourceMiscFlags::default(), //detached from builder
                     width: self.width,
                     height: self.height,
                     format: self.format,
@@ -255,7 +264,7 @@ impl TextureMapBuilder {
                 let header = TextureMapHeaderV2 {
                     type_: self.texture_type,
                     texd_identifier: self.texd_identifier,
-                    flags: self.flags,
+                    flags: RenderResourceMiscFlags::default(), //detached from builder 
                     width: self.width,
                     height: self.height,
                     format: self.format,
