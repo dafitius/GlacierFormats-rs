@@ -1,5 +1,6 @@
 use crate::enums::{Dimensions, InterpretAs, RenderFormat, RenderResourceMiscFlags, TextureType};
 use std::{fs, io, slice};
+use std::cmp::{max, min};
 use std::io::{BufWriter, Cursor, Read, Seek, Write};
 use std::path::Path;
 use std::ptr::NonNull;
@@ -180,14 +181,14 @@ impl TextureMapBuilder {
         self
     }
 
-    pub fn generate_mipblock1(mut self, enabled: bool) -> Self {
+    pub fn with_mipblock1(mut self, enabled: bool) -> Self {
         self.use_mipblock1 = enabled;
         self
     }
 
     ///Setting this flag will make the game use the compressed pixels without decompressing first.
     pub fn with_compressed_colors(mut self) -> Self {
-        self.params.flags = self.params.with_no_color_compression(false);
+        self.params.flags = self.params.flags.with_no_color_compression(false);
         self
     }
 
@@ -224,13 +225,13 @@ impl TextureMapBuilder {
             MipFilter::Nearest => { TEX_FILTER_FLAGS::TEX_FILTER_POINT }
             MipFilter::Linear => { TEX_FILTER_FLAGS::TEX_FILTER_LINEAR }
             MipFilter::Cubic => { TEX_FILTER_FLAGS::TEX_FILTER_CUBIC }
-            MipFilter::Box => { TEX_FILTER_FLAGS::TEX_FILTER_FANT }
-        }, match self.params.num_mip_levels {
+            MipFilter::Box => { TEX_FILTER_FLAGS::TEX_FILTER_BOX }
+        } | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC, match self.params.num_mip_levels {
             MipLevels::All => { 0 }
             MipLevels::Limit(n) => { n as usize }
         })?;
 
-        if self.image.metadata().format.into() != self.params.format {
+        if RenderFormat::from(self.image.metadata().format) != self.params.format {
             image = Self::convert_to_format(image, self.params.format.into())?;
         }
 
@@ -313,7 +314,7 @@ impl TextureMapBuilder {
                     height,
                     format: self.params.format,
                     num_mip_levels,
-                    default_mip_level: self.params.default_mip_level,
+                    default_mip_level: max(self.params.default_mip_level, 1), //H2 crashes with index 0
                     mip_sizes,
                     compressed_mip_sizes,
                     has_atlas: self.atlas_data.is_some(),

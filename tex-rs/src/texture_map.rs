@@ -1,5 +1,6 @@
 use std::io;
 use std::io::{Cursor, Read, Seek, Write};
+use std::mem::size_of;
 use binrw::{BinRead, binread, BinReaderExt, BinResult, binrw, BinWrite, BinWriterExt, Endian};
 use binrw::helpers::until_eof;
 use serde::{Deserialize, Serialize};
@@ -604,7 +605,7 @@ impl TextureMap {
             }
             WoaVersion::HM3 => {
                 if self.has_mipblock1(){ //if texture has a TEXD
-                    self.mip_sizes().first().cloned().unwrap_or(0) //the size of the largest TEXD mip
+                    self.mip_sizes().first().cloned().unwrap_or(0) + self.mip_sizes().get(1).cloned().unwrap_or(0) //the size of the largest two TEXD mip
                 } else {0}
             }
         }
