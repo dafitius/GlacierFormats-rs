@@ -1,10 +1,9 @@
 use crate::enums::{Dimensions, InterpretAs, RenderFormat, RenderResourceMiscFlags, TextureType};
 use std::{fs, io, slice};
-use std::cmp::{max, min};
-use std::io::{BufWriter, Cursor, Read, Seek, Write};
+use std::cmp::max;
+use std::io::{Cursor, Read};
 use std::path::Path;
 use std::ptr::NonNull;
-use binrw::BinWrite;
 use directxtex::{DXGI_FORMAT, Image, ScratchImage, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
 use lz4::block::CompressionMode;
 use thiserror::Error;
@@ -27,42 +26,6 @@ pub enum TexturePackerError {
     PackingError(String),
 }
 
-/// TexturePacker struct that serves as both a builder and packer for TextureMap.
-pub struct TexturePacker {
-    texture_map: TextureMap,
-}
-
-impl TexturePacker {
-    //Creates a new TexturePacker from a TextureMap
-    pub fn from_texture_map(texture: TextureMap) -> TexturePacker {
-        Self {
-            texture_map: texture,
-        }
-    }
-
-    /// Packs the TextureMap to a `Vec<u8>`.
-    pub fn pack_to_vec(&self) -> Result<Vec<u8>, TexturePackerError> {
-        let mut writer = Cursor::new(Vec::new());
-        self.pack_internal(&mut writer)?;
-        Ok(writer.into_inner())
-    }
-
-    /// Packs the TextureMap to a file at the specified path.
-    pub fn pack_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), TexturePackerError> {
-        let file = fs::File::create(path).map_err(TexturePackerError::IoError)?;
-        let mut writer = BufWriter::new(file);
-        self.pack_internal(&mut writer)?;
-        Ok(())
-    }
-
-    /// Internal method to serialize the TextureMap.
-    fn pack_internal<W: Write + Seek>(&self, writer: &mut W) -> Result<(), TexturePackerError> {
-        self.texture_map
-            .write_le_args(writer, ())
-            .map_err(TexturePackerError::SerializationError)?;
-        Ok(())
-    }
-}
 
 pub enum MipLevels {
     All,
@@ -120,7 +83,7 @@ impl TextureMapBuilder {
         image_path: P,
     ) -> Result<Self, TexturePackerError> {
         let image_data = fs::read(&image_path).map_err(TexturePackerError::IoError)?;
-        let mut image = directxtex::ScratchImage::load_tga(
+        let mut image = ScratchImage::load_tga(
             image_data.as_slice(),
             TGA_FLAGS::TGA_FLAGS_NONE,
             None,
@@ -192,11 +155,30 @@ impl TextureMapBuilder {
         self
     }
 
-    /// Disabled until a use-case is found
-    fn with_swizzled_texture(mut self) -> Self {
+    pub fn with_swizzled_texture(mut self) -> Self {
         self.params.flags = self.params.flags.with_texture_swizzled(true);
         self
     }
+
+    #[cfg(feature = "unstable")]
+    pub fn with_flags(mut self, flags: RenderResourceMiscFlags) -> Self {
+        self.params.flags = flags;
+        self
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn with_dimensions(mut self, dimensions: Dimensions) -> Self {
+        self.params.dimensions = dimensions;
+        self
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn with_texd_id(mut self, texd_id: u32) -> Self {
+        self.params.texd_identifier = texd_id;
+        self
+    }
+
+
 
     ///Convert the image to a different format.
     /// It is assumed that the input image is not compressed
@@ -217,7 +199,7 @@ impl TextureMapBuilder {
     }
 
     /// Final build method to create a TextureMap.
-    pub fn build(mut self, woa_version: WoaVersion) -> Result<TextureMap, TexturePackerError> {
+    pub fn build(self, woa_version: WoaVersion) -> Result<TextureMap, TexturePackerError> {
         let width = self.image.metadata().width as u16;
         let height = self.image.metadata().height as u16;
 
@@ -275,7 +257,7 @@ impl TextureMapBuilder {
 
         let texture_data = if self.use_mipblock1 {
             TextureData::Mipblock1(MipblockData {
-                video_memory_requirement: mip_sizes.first().copied().unwrap_or(0x0) as usize,
+                video_memory_requirement: (mip_sizes.first().copied().unwrap_or(0x0) + mip_sizes.get(1).copied().unwrap_or(0x0)) as usize,
                 header: vec![],
                 data,
             })
@@ -288,6 +270,9 @@ impl TextureMapBuilder {
                 let header = TextureMapHeaderV1 {
                     type_: self.params.texture_type,
                     texd_identifier: self.params.texd_identifier,
+                    #[cfg(feature = "unstable")]
+                    flags: self.params.flags,
+                    #[cfg(not(feature = "unstable"))]
                     flags: RenderResourceMiscFlags::default(), //detached from builder
                     width,
                     height,
@@ -309,6 +294,9 @@ impl TextureMapBuilder {
                 let header = TextureMapHeaderV2 {
                     type_: self.params.texture_type,
                     texd_identifier: self.params.texd_identifier,
+                    #[cfg(feature = "unstable")]
+                    flags: self.params.flags,
+                    #[cfg(not(feature = "unstable"))]
                     flags: RenderResourceMiscFlags::default(), //detached from builder
                     width,
                     height,

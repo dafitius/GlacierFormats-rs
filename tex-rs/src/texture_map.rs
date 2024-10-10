@@ -1,10 +1,14 @@
-use std::io;
-use std::io::{Cursor, Read, Seek, Write};
+#![allow(unused_variables)]
+
+use std::{fs, io};
+use std::io::{BufWriter, Cursor, Read, Seek, Write};
 use std::mem::size_of;
+use std::path::Path;
 use binrw::{BinRead, binread, BinReaderExt, BinResult, binrw, BinWrite, BinWriterExt, Endian};
 use binrw::helpers::until_eof;
 use serde::{Deserialize, Serialize};
 use crate::enums::*;
+use crate::pack::TexturePackerError;
 use crate::WoaVersion;
 
 const MAX_MIP_LEVELS: usize = 0xE;
@@ -426,7 +430,7 @@ where
 
 impl<A> BinWrite for TextureMapInner<A>
 where
-    A: for<'a> BinWrite<Args<'a>=((DynamicTextureMapArgs,))> + Clone + for<'a> binrw::BinRead<Args<'a>=()>,
+    A: for<'a> BinWrite<Args<'a>=(DynamicTextureMapArgs,)> + Clone + for<'a> binrw::BinRead<Args<'a>=()>,
     A: TextureMapHeaderImpl,
 {
     type Args<'a> = ();
@@ -462,7 +466,7 @@ impl<A> TextureMapInner<A>
 where
     A: for<'a> BinRead<Args<'a>=()>,
     A: Clone,
-    A: for<'a> binrw::BinWrite<Args<'a>=((DynamicTextureMapArgs,))>,
+    A: for<'a> binrw::BinWrite<Args<'a>=(DynamicTextureMapArgs,)>,
     A: TextureMapHeaderImpl,
 {
     pub fn get_data(&self) -> &Vec<u8> {
@@ -597,15 +601,15 @@ impl TextureMap {
         }
     }
 
-    pub fn video_memory_requirement(&self) -> u32 {
+    pub fn video_memory_requirement(&self) -> usize {
         match self.version(){
             WoaVersion::HM2016 |
             WoaVersion::HM2 => {
-                self.mip_sizes().get(self.text_scale()).cloned().unwrap_or(0) //The size of the largest TEXT mip
+                self.mip_sizes().get(self.text_scale()).cloned().unwrap_or(0) as usize //The size of the largest TEXT mip
             }
             WoaVersion::HM3 => {
                 if self.has_mipblock1(){ //if texture has a TEXD
-                    self.mip_sizes().first().cloned().unwrap_or(0) + self.mip_sizes().get(1).cloned().unwrap_or(0) //the size of the largest two TEXD mip
+                    (self.mip_sizes().first().cloned().unwrap_or(0) + self.mip_sizes().get(1).cloned().unwrap_or(0)) as usize //the size of the largest two TEXD mip
                 } else {0}
             }
         }
@@ -782,6 +786,25 @@ impl TextureMap {
 
         Ok(writer.into_inner())
     }
+
+    pub fn pack_to_vec(&self) -> Result<Vec<u8>, TexturePackerError> {
+        let mut writer = Cursor::new(Vec::new());
+        self.pack_internal(&mut writer)?;
+        Ok(writer.into_inner())
+    }
+
+    pub fn pack_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), TexturePackerError> {
+        let file = fs::File::create(path).map_err(TexturePackerError::IoError)?;
+        let mut writer = BufWriter::new(file);
+        self.pack_internal(&mut writer)?;
+        Ok(())
+    }
+
+    fn pack_internal<W: Write + Seek>(&self, writer: &mut W) -> Result<(), TexturePackerError> {
+        self.write_le_args(writer, ())
+            .map_err(TexturePackerError::SerializationError)?;
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -800,6 +823,8 @@ impl From<MipblockData> for Vec<u8> {
 impl MipblockData{
     pub fn new(data: &Vec<u8>, version: WoaVersion) -> Result<Self, TextureMapError>{
         let mut stream = Cursor::new(data);
+        let mut header = vec![];
+        let mut memory_reqs = 0;
 
         let read_size = match version {
             WoaVersion::HM2016 => {
@@ -812,6 +837,13 @@ impl MipblockData{
                 if texd_header.has_atlas {
                     atlas = Some(AtlasData::read_le(&mut stream)?);
                 }
+
+                header = vec![0u8; stream.position() as usize];
+                stream.set_position(0);
+                stream.read_exact(&mut header).map_err(TextureMapError::IoError)?;
+
+                memory_reqs = (texd_header.mip_sizes.first().copied().unwrap_or(0x0) + texd_header.mip_sizes.get(1).copied().unwrap_or(0x0)) as usize;
+
                 data_size as usize - (TextureMapHeaderV1::size() - 8) - atlas.map(|a| a.size()).unwrap_or(0)
             }
             WoaVersion::HM2 => {
@@ -824,6 +856,13 @@ impl MipblockData{
                 if texd_header.has_atlas {
                     atlas = Some(AtlasData::read_le(&mut stream)?);
                 }
+
+                header = vec![0u8; stream.position() as usize];
+                stream.set_position(0);
+                stream.read_exact(&mut header).map_err(TextureMapError::IoError)?;
+
+                memory_reqs = (texd_header.mip_sizes.first().copied().unwrap_or(0x0) + texd_header.mip_sizes.get(1).copied().unwrap_or(0x0)) as usize;
+
                 data_size as usize - (TextureMapHeaderV2::size()) - atlas.map(|a| a.size()).unwrap_or(0)
             }
             WoaVersion::HM3 => {
@@ -834,32 +873,39 @@ impl MipblockData{
         let mut buffer = vec![0u8; read_size];
         stream.read_exact(&mut buffer)?;
         Ok(Self{
-            video_memory_requirement: 0,
-            header: vec![],
+            video_memory_requirement: memory_reqs,
+            header,
             data: buffer,
         })
     }
 
-    // pub(crate) fn insert_text_header(&mut self, texture_map: &TextureMap)
-    // {
-    //     if let Ok(header) = texture_map.texd_header(){
-    //         self.header = header;
-    //     }
-    // }
+    pub fn video_memory_requirement(&self) -> usize{
+        self.video_memory_requirement
+    }
 
-    pub fn data(&self, woa_version: WoaVersion) -> Vec<u8>{
-        match woa_version{
+    pub fn pack_to_vec(&self, woa_version: WoaVersion) -> Result<Vec<u8>, TexturePackerError> {
+        let mut writer = Cursor::new(Vec::new());
+        self.pack_internal(&mut writer, woa_version)?;
+        Ok(writer.into_inner())
+    }
+
+    pub fn pack_to_file<P: AsRef<Path>>(&self, path: P, woa_version: WoaVersion) -> Result<(), TexturePackerError> {
+        let file = fs::File::create(path).map_err(TexturePackerError::IoError)?;
+        let mut writer = BufWriter::new(file);
+        self.pack_internal(&mut writer, woa_version)?;
+        Ok(())
+    }
+
+    fn pack_internal<W: Write + Seek>(&self, writer: &mut W, woa_version: WoaVersion) -> Result<(), TexturePackerError> {
+        writer.write_all(match woa_version{
             WoaVersion::HM2016 |
             WoaVersion::HM2 => {
-                self.header.iter().chain(&self.data).cloned().collect()
+                self.header.iter().chain(&self.data).cloned().collect::<Vec<u8>>()
             }
             WoaVersion::HM3 => {
                 self.data.clone()
             }
-        }
-    }
-
-    pub fn video_memory_requirement(&self) -> usize{
-        self.video_memory_requirement
+        }.as_slice()).map_err(|e| TexturePackerError::PackingError(format!("Unable to pack mipblock1: {}",e)))?;
+        Ok(())
     }
 }

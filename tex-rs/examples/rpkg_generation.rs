@@ -1,6 +1,7 @@
+
 use std::path::PathBuf;
 use rpkg_rs::resource::package_builder::{PackageBuilder, PackageResourceBuilder};
-use rpkg_rs::resource::pdefs::PartitionId;
+use rpkg_rs::resource::pdefs::{PartitionId, PartitionType};
 use rpkg_rs::resource::resource_package::{PackageVersion, ReferenceType, ResourceReferenceFlags, ResourceReferenceFlagsStandard};
 use rpkg_rs::resource::resource_partition::PatchId;
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
@@ -17,8 +18,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let texd_rrid = RuntimeResourceID::from_hex_string("00752CEA9F76AB7E")?;
     let woa_version = WoaVersion::HM3;
 
-    let partition_id: PartitionId = "chunk12".parse().unwrap();
-    let patch_id: PatchId = PatchId::Patch(5);
+    let partition_id : PartitionId = "chunk12".parse().unwrap();
+    let patch_id : PatchId = PatchId::Patch(5);
 
     let add_texd = true;
 
@@ -35,34 +36,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_format(RenderFormat::DXT1).build(woa_version)?;
 
     //Add resources to package
-    let mut texture_resource = PackageResourceBuilder::from_memory(
-        text_rrid,
-        "TEXT",
-        texture.pack_to_vec()?,
-        match woa_version {
-            WoaVersion::HM2016 => { Some(12) }
-            WoaVersion::HM2 => { None }
-            WoaVersion::HM3 => { None }
-        },
-        true,
-    )?;
-    texture_resource.with_memory_requirements(0xFFFFFFFF, texture.video_memory_requirement() as u32);
-
-    if texture.has_mipblock1() {
+    let mut texture_resource = PackageResourceBuilder::from_glacier_resource(text_rrid, &texture, woa_version.into())?;
+    if texture.has_mipblock1(){
         let mipblock1 = texture.get_mipblock1().unwrap();
-        let highmip_resource = PackageResourceBuilder::from_memory(
-            texd_rrid,
-            "TEXD",
-            mipblock1.pack_to_vec(woa_version)?,
-            None,
-            false)?;
-        texture_resource.with_memory_requirements(0xFFFFFFFF, mipblock1.video_memory_requirement() as u32);
-
+        let highmip_resource = PackageResourceBuilder::from_glacier_resource(texd_rrid, &mipblock1, woa_version.into())?;
         texture_resource.with_reference(texd_rrid, ResourceReferenceFlags::Standard(ResourceReferenceFlagsStandard::new().with_reference_type(ReferenceType::WEAK)));
         package.with_resource(highmip_resource);
     }
     package.with_resource(texture_resource);
 
-    package.build_to_file(PackageVersion::RPKGv2, "./target".as_ref())?;
+    package.build_to_file(PackageVersion::RPKGv1, "./target".as_ref())?;
     Ok(())
 }

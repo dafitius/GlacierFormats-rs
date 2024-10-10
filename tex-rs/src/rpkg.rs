@@ -79,7 +79,7 @@ impl GlacierResource for MipblockData{
         if self.header.is_empty() && (woa_version == rpkg_rs::WoaVersion::HM2016 || woa_version == rpkg_rs::WoaVersion::HM2) {
             return Err(GlacierResourceError::ReadError(format!("Cannot serialize to {:?} without header data :(", woa_version)));
         }
-        Ok(self.data(woa_version.into()))
+        self.pack_to_vec(woa_version.into()).map_err( |e| GlacierResourceError::WriteError(format!("Texd packing error: {}", e)))
     }
 
     fn resource_type(&self) -> [u8; 4] {

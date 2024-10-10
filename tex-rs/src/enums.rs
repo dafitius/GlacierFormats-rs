@@ -150,27 +150,27 @@ impl From<Dimensions> for TEX_DIMENSION {
 //most of these are unused...
 pub struct RenderResourceMiscFlags
 {
-    persistent_data: bool,
-    pub texture_cube: bool,
-    texture_normalmap: bool,
-    pub texture_swizzled: bool, //Does not affect the texture in-game. Usually not enabled on non-normal/color types, or uncompressed formats
-    pub temp_alloc: bool,       //Only used on atlas textures
-    unused2: bool,
+    pub persistent_data: bool,
+    pub texture_cube: bool,         //Used on cubemaps
+    pub texture_normalmap: bool,
+    pub texture_swizzled: bool,     //Does not affect the texture in-game. Usually not enabled on non-normal/color types, or uncompressed formats
+    pub temp_alloc: bool,           //Only used on atlas textures
+    pub unused2: bool,
     pub no_color_compression: bool, //stops texture from being stored compressed in memory
-    has_analysis_data: bool,
-    texture_srgb: bool,
-    force_main_mem: bool,
-    shared: bool,
-    buffer_structured: bool,
-    linear_data: bool,
-    esram_resolve_present: bool,
-    draw_indirect_args: bool,
-    no_stencil: bool,
-    texture_streamer: bool,
-    dx11afr_dont_copy: bool,
-    dx12afr_mgpu_visible: bool,
-    ms: bool,
-    ps4_no_h_tile: bool,
+    pub has_analysis_data: bool,
+    pub texture_srgb: bool,
+    pub force_main_mem: bool,
+    pub shared: bool,
+    pub buffer_structured: bool,
+    pub linear_data: bool,
+    pub esram_resolve_present: bool,
+    pub draw_indirect_args: bool,
+    pub no_stencil: bool,
+    pub texture_streamer: bool,
+    pub dx11afr_dont_copy: bool,
+    pub dx12afr_mgpu_visible: bool,
+    pub ms: bool,
+    pub ps4_no_h_tile: bool,
 
     #[bits(11)]
     __: u32,
