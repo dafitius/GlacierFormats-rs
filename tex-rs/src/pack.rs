@@ -9,7 +9,7 @@ use lz4::block::CompressionMode;
 use thiserror::Error;
 use crate::texture_map::{AtlasData, MipblockData, TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3, TextureMapInner};
 use crate::pack::TexturePackerError::{DirectXTexError, PackingError};
-use crate::WoaVersion;
+use crate::{convert, WoaVersion};
 
 #[derive(Debug, Error)]
 pub enum TexturePackerError {
@@ -79,10 +79,11 @@ pub struct TextureMapBuilder {
 
 impl TextureMapBuilder {
     /// Creates a new TextureMapBuilder with default settings.
-    pub fn from_tga<P: AsRef<Path>>(
-        image_path: P,
+    pub fn from_tga<R: Read>(
+        mut reader: R,
     ) -> Result<Self, TexturePackerError> {
-        let image_data = fs::read(&image_path).map_err(TexturePackerError::IoError)?;
+        let mut image_data = vec![];
+        reader.read_to_end(&mut image_data).map_err(TexturePackerError::IoError)?;
         let mut image = ScratchImage::load_tga(
             image_data.as_slice(),
             TGA_FLAGS::TGA_FLAGS_NONE,
@@ -105,6 +106,20 @@ impl TextureMapBuilder {
             image,
             use_mipblock1: true,
         })
+    }
+
+    pub fn from_texture_map(texture: &TextureMap) -> Result<Self, TexturePackerError>{
+        let mut builder = convert::create_tga(texture).map(|tga| {
+            let reader = Cursor::new(tga);
+            Self::from_tga(reader)
+        }).map_err(|e| PackingError("Failed to convert texture".to_string()))??;
+        
+        builder.atlas_data = texture.get_atlas_data().clone();
+        builder.params.texture_type = texture.texture_type();
+        if let Some(interpret_as) = texture.interpret_as(){
+            builder.params.interpret_as = interpret_as;
+        }
+        Ok(builder)
     }
 
     // Builder methods for each field
