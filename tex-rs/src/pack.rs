@@ -1,8 +1,7 @@
 use crate::enums::{Dimensions, InterpretAs, RenderFormat, RenderResourceMiscFlags, TextureType};
-use std::{fs, io, slice};
+use std::{io, slice};
 use std::cmp::max;
 use std::io::{Cursor, Read};
-use std::path::Path;
 use std::ptr::NonNull;
 use directxtex::{DXGI_FORMAT, Image, ScratchImage, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
 use lz4::block::CompressionMode;
@@ -55,7 +54,7 @@ impl TextureMapParams {
     pub fn new(format: RenderFormat) -> Self {
         Self {
             texture_type: TextureType::Colour,
-            interpret_as: InterpretAs::Colour,
+            interpret_as: InterpretAs::Normal,
             dimensions: Dimensions::_2D,
 
             flags: RenderResourceMiscFlags::default()
@@ -112,7 +111,7 @@ impl TextureMapBuilder {
         let mut builder = convert::create_tga(texture).map(|tga| {
             let reader = Cursor::new(tga);
             Self::from_tga(reader)
-        }).map_err(|e| PackingError("Failed to convert texture".to_string()))??;
+        }).map_err(|e| PackingError(format!("Failed to convert texture: {}", e)))??;
         
         builder.atlas_data = texture.get_atlas_data().clone();
         builder.params.texture_type = texture.texture_type();
