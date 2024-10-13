@@ -1,7 +1,8 @@
-
+use std::fs;
+use std::io::Cursor;
 use std::path::PathBuf;
 use rpkg_rs::resource::package_builder::{PackageBuilder, PackageResourceBuilder};
-use rpkg_rs::resource::pdefs::{PartitionId, PartitionType};
+use rpkg_rs::resource::pdefs::{PartitionId};
 use rpkg_rs::resource::resource_package::{PackageVersion, ReferenceType, ResourceReferenceFlags, ResourceReferenceFlagsStandard};
 use rpkg_rs::resource::resource_partition::PatchId;
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
@@ -27,8 +28,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut package = PackageBuilder::new_with_patch_id(partition_id, patch_id);
 
     //Create texture from tga
+    let tga_data = Cursor::new(fs::read(tga_path)?);
     let texture =
-        TextureMapBuilder::from_tga(tga_path)?
+        TextureMapBuilder::from_tga(tga_data)?
             .interpret_as(InterpretAs::Normal)
             .texture_type(TextureType::Colour)
             .with_mip_filter(Linear)

@@ -41,8 +41,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create texture from tga
     let texture =
         TextureMapBuilder::from_texture_map(&old_texture)?
-            .interpret_as(InterpretAs::Normal)
-            .texture_type(TextureType::Colour)
             .with_mip_filter(Linear)
             .with_mipblock1(add_texd)
             .with_format(RenderFormat::DXT1).build(woa_version)?;
