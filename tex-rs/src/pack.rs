@@ -6,9 +6,11 @@ use std::ptr::NonNull;
 use directxtex::{DXGI_FORMAT, Image, ScratchImage, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
 use lz4::block::CompressionMode;
 use thiserror::Error;
-use crate::texture_map::{AtlasData, MipblockData, TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3, TextureMapInner};
+use crate::texture_map::{TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3, TextureMapInner};
 use crate::pack::TexturePackerError::{DirectXTexError, PackingError};
 use crate::{convert, WoaVersion};
+use crate::atlas::AtlasData;
+use crate::mipblock::MipblockData;
 
 #[derive(Debug, Error)]
 pub enum TexturePackerError {
@@ -113,7 +115,7 @@ impl TextureMapBuilder {
             Self::from_tga(reader)
         }).map_err(|e| PackingError(format!("Failed to convert texture: {}", e)))??;
         
-        builder.atlas_data = texture.get_atlas_data().clone();
+        builder.atlas_data = texture.atlas().clone();
         builder.params.texture_type = texture.texture_type();
         if let Some(interpret_as) = texture.interpret_as(){
             builder.params.interpret_as = interpret_as;

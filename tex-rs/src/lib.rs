@@ -7,6 +7,8 @@ pub mod rpkg;
 pub mod convert;
 pub mod pack;
 pub mod enums;
+pub mod mipblock;
+pub mod atlas;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum WoaVersion {

@@ -1,8 +1,9 @@
 use std::io::Cursor;
 use binrw::{BinRead, BinWrite};
 use rpkg_rs::{GlacierResource, GlacierResourceError};
+use crate::mipblock::MipblockData;
 use crate::pack::TexturePackerError;
-use crate::texture_map::{MipblockData, TextureMap};
+use crate::texture_map::TextureMap;
 use crate::WoaVersion;
 
 
@@ -112,7 +113,7 @@ pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionMan
 
     if let Some((rrid, _)) = res_info.references().first(){
         let texd_data = manager.read_resource_from("chunk0".parse().unwrap(), *rrid).map_err(|e| GlacierResourceError::ReadError(format!("Tried to load broken depend: {}", e)))?;
-        texture_map.set_mipblock1_data(&texd_data, WoaVersion::from(woa_version)).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+        texture_map.set_mipblock1_raw(&texd_data, WoaVersion::from(woa_version)).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
     }
     Ok(texture_map)
 }

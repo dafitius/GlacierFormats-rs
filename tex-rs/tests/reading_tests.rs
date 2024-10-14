@@ -106,7 +106,7 @@ fn read_all_text_texd_in_game(woa_version: rpkg_rs::WoaVersion, game_paths: Game
                     Ok(mut texture_map) => {
                         if let Some(texd_ref) = resource.references().get(0) {
                             let texd_data = package_manager.read_resource_from(partition.partition_info().id(), texd_ref.0).map_err(|e| GlacierResourceError::ReadError(e.to_string())).unwrap();
-                            texture_map.set_mipblock1_data(&texd_data, woa_version.into()).unwrap();
+                            texture_map.set_mipblock1_raw(&texd_data, woa_version.into()).unwrap();
                         }
                     }
                     Err(e) => {

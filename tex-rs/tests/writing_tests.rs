@@ -110,7 +110,7 @@ fn write_all_text_texd_in_game(woa_version: rpkg_rs::WoaVersion, game_paths: Gam
                 if let Ok(mut texture_map) = TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version),)) {
                     if let Some(texd_ref) = resource.references().get(0) {
                         texd_data = package_manager.read_resource_from(partition.partition_info().id(), texd_ref.0).map_err(|e| GlacierResourceError::ReadError(e.to_string())).unwrap();
-                        texture_map.set_mipblock1_data(&texd_data, woa_version.into()).unwrap();
+                        texture_map.set_mipblock1_raw(&texd_data, woa_version.into()).unwrap();
                     }
                     let packer = TexturePacker::new_from_texture_map(texture_map.clone());
                     let vec = packer.pack_to_vec().unwrap();

@@ -23,8 +23,8 @@ pub enum TextureConversionError {
 pub fn create_dds(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
 
 
-    let mut mips = (0..tex.get_num_mip_levels()).filter_map(|i| -> Option<MipLevel> {
-        if let Ok(mip) = tex.get_mip_level(i) { if mip.height > 0 && mip.width > 0 { Some(mip) } else { None } } else { None }
+    let mut mips = (0..tex.num_mip_levels()).filter_map(|i| -> Option<MipLevel> {
+        if let Ok(mip) = tex.mipmap(i) { if mip.height > 0 && mip.width > 0 { Some(mip) } else { None } } else { None }
     }).collect::<Vec<_>>();
 
     let first_mip = mips.first().ok_or(TextureConversionError::InvalidTexture("There are no mips on the texture".to_string()))?;
@@ -99,7 +99,7 @@ fn decompress_dds(tex: &TextureMap, scratch_image: ScratchImage) -> Result<Scrat
 }
 
 pub fn create_mip_dds(tex: &TextureMap, mip_level: usize, decompress: bool) -> Result<Vec<u8>, TextureConversionError> {
-    if let Ok(mut mip) = tex.get_mip_level(mip_level) {
+    if let Ok(mut mip) = tex.mipmap(mip_level) {
         let meta_data = TexMetadata {
             width: mip.width,
             height: mip.height,
@@ -130,6 +130,6 @@ pub fn create_mip_dds(tex: &TextureMap, mip_level: usize, decompress: bool) -> R
         }
         Ok(Vec::from(blob.buffer()))
     } else {
-        Err(TextureConversionError::MipOutOfBounds(mip_level, tex.get_num_mip_levels()))
+        Err(TextureConversionError::MipOutOfBounds(mip_level, tex.num_mip_levels()))
     }
 }

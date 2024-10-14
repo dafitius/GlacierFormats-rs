@@ -216,15 +216,14 @@ fn main() -> Result<()> {
 fn read_texture(cmd: &ConvertTextureMap, silent: bool) -> Result<TextureMap> {
     let input_data = fs::read(&cmd.input_path)
         .with_context(|| format!("Failed to read input TEXT file at {:?}", cmd.input_path))?;
-    let mut stream = Cursor::new(input_data);
 
-    let mut tex = TextureMap::read_le_args(&mut stream, (cmd.game_version,))
+    let mut tex = TextureMap::from_memory(input_data, cmd.game_version)
         .context("Failed to parse the TEXT file into TextureMap")?;
 
     if let Some(texd_path) = &cmd.texd_path {
         let texd_data = fs::read(texd_path)
             .with_context(|| format!("Failed to read TEXD file at {:?}", texd_path))?;
-        tex.set_mipblock1_data(&texd_data, cmd.game_version)
+        tex.set_mipblock1_raw(&texd_data, cmd.game_version)
             .context("Failed to apply TEXD data to TextureMap")?;
     }
 
@@ -235,7 +234,7 @@ fn read_texture(cmd: &ConvertTextureMap, silent: bool) -> Result<TextureMap> {
             println!("{:<15}: {:?}", "interpret", interpret);
         }
         println!("{:<15}: {}x{}", "size", tex.width(), tex.height());
-        println!("{:<15}: {}", "mip amount", tex.get_num_mip_levels());
+        println!("{:<15}: {}", "mip amount", tex.num_mip_levels());
         println!("{:<15}: {}", "has atlas", tex.has_atlas());
     }
 
@@ -247,16 +246,15 @@ fn read_texture(cmd: &ConvertTextureMap, silent: bool) -> Result<TextureMap> {
 fn read_texture_port(cmd: &PortTextureMap) -> Result<TextureMap> {
     let input_data = fs::read(&cmd.input_path)
         .with_context(|| format!("Failed to read input TEXT file at {:?}", cmd.input_path))?;
-    let mut stream = Cursor::new(input_data);
 
-    let tex = TextureMap::read_le_args(&mut stream, (cmd.from_version,))
+    let tex = TextureMap::from_memory(input_data, cmd.from_version)
         .context("Failed to parse the TEXT file into TextureMap")?;
 
     if let Some(texd_path) = &cmd.texd_path {
         let texd_data = fs::read(texd_path)
             .with_context(|| format!("Failed to read TEXD file at {:?}", texd_path))?;
         let mut tex_with_texd = tex.clone();
-        tex_with_texd.set_mipblock1_data(&texd_data, cmd.from_version)
+        tex_with_texd.set_mipblock1_raw(&texd_data, cmd.from_version)
             .context("Failed to apply TEXD data to TextureMap")?;
         Ok(tex_with_texd)
     } else {

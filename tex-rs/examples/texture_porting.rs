@@ -25,10 +25,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let text_data = fs::read("./target/0005D89496C3FC78.TEXT")?;
     let texd_data = fs::read("./target/00EFBDEB0ED40D59.TEXD")?;
 
-    let mut reader = Cursor::new(text_data);
-    let mut old_texture = TextureMap::read_le_args(&mut reader, (WoaVersion::HM2,))?;
-    old_texture.set_mipblock1_data(&texd_data, WoaVersion::HM2)?;
-
+    let mut old_texture = TextureMap::from_memory(text_data, WoaVersion::HM2)?;
+    old_texture.set_mipblock1_raw(&texd_data, WoaVersion::HM2)?;
 
     let partition_id : PartitionId = "chunk12".parse().unwrap();
     let patch_id : PatchId = PatchId::Patch(5);
