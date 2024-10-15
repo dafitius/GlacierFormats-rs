@@ -21,7 +21,17 @@ impl From<MipblockData> for Vec<u8> {
 }
 
 impl MipblockData{
-    pub fn new(data: &Vec<u8>, version: WoaVersion) -> Result<Self, TextureMapError>{
+
+    pub fn from_file<P: AsRef<Path>>(path: P, woa_version: WoaVersion) -> Result<Self, TextureMapError> {
+        let data = fs::read(path).map_err(TextureMapError::IoError)?;
+        Self::new_inner(&data, woa_version)
+    }
+
+    pub fn from_memory(data: &[u8], woa_version: WoaVersion) -> Result<Self, TextureMapError> {
+        Self::new_inner(data, woa_version)
+    }
+
+    fn new_inner(data: &[u8], version: WoaVersion) -> Result<Self, TextureMapError>{
         let mut stream = Cursor::new(data);
         let mut header = vec![];
         let mut memory_reqs = 0;

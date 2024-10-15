@@ -72,7 +72,7 @@ impl GlacierResource for MipblockData{
     type Output = MipblockData;
 
     fn process_data<R: AsRef<[u8]>>(woa_version: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
-        let mipblock = MipblockData::new(&data.as_ref().to_vec(), woa_version.into()).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+        let mipblock = MipblockData::from_memory(data.as_ref(), woa_version.into()).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
         Ok(mipblock)
     }
 
@@ -113,7 +113,8 @@ pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionMan
 
     if let Some((rrid, _)) = res_info.references().first(){
         let texd_data = manager.read_resource_from("chunk0".parse().unwrap(), *rrid).map_err(|e| GlacierResourceError::ReadError(format!("Tried to load broken depend: {}", e)))?;
-        texture_map.set_mipblock1_raw(&texd_data, WoaVersion::from(woa_version)).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+        let mipblock = MipblockData::from_memory(texd_data.as_slice(), woa_version.into()).map_err(|e| GlacierResourceError::ReadError(format!("Failed to read texd: {}", e)))?;
+        texture_map.set_mipblock1(mipblock);
     }
     Ok(texture_map)
 }

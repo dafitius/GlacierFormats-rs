@@ -672,8 +672,8 @@ impl TextureMap {
         TextureMap::read_le_args(&mut reader, (woa_version,)).map_err(TextureMapError::ParsingError)
     }
 
-    pub fn from_memory(data: Vec<u8>, woa_version: WoaVersion) -> Result<Self, TextureMapError> {
-        let mut reader = Cursor::new(&data);
+    pub fn from_memory(data: &[u8], woa_version: WoaVersion) -> Result<Self, TextureMapError> {
+        let mut reader = Cursor::new(data);
         TextureMap::read_le_args(&mut reader, (woa_version,)).map_err(TextureMapError::ParsingError)
     }
 
@@ -734,12 +734,6 @@ impl TextureMap {
 
     pub fn has_atlas(&self) -> bool {
         self.atlas().is_some()
-    }
-
-    pub fn set_mipblock1_raw(&mut self, texd_data: &Vec<u8>, version: WoaVersion) -> Result<(), TextureMapError> {
-        let mipblock = MipblockData::new(texd_data, version)?;
-        self.set_data(TextureData::Mipblock1(mipblock));
-        Ok(())
     }
 
     pub fn set_mipblock1(&mut self, mipblock: MipblockData){

@@ -154,7 +154,7 @@ impl TextureMapBuilder {
         self
     }
 
-    pub fn atlas_data(mut self, atlas_data: AtlasData) -> Self {
+    pub fn with_atlas(mut self, atlas_data: AtlasData) -> Self {
         self.atlas_data = Some(atlas_data);
         self.params.flags = self.params.flags.with_temp_alloc(true);
         self

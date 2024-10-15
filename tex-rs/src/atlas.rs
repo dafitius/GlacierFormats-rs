@@ -57,8 +57,10 @@ impl AtlasData {
                 (column, row, vertices)
             })
     }
-    
-    pub fn new_grid(width: u32, height: u32, padding_x: f32, padding_y: f32) -> Self {
+
+
+
+    pub fn new_grid(width: u32, height: u32) -> Self {
         let polygon_vertex_count = 4;
 
         let total_tiles = width * height;
@@ -66,45 +68,37 @@ impl AtlasData {
 
         let mut polygon_vertices = Vec::with_capacity(total_vertices as usize);
 
-        let total_padding_x = padding_x * (width - 1) as f32;
-        let total_padding_y = padding_y * (height - 1) as f32;
-
-        let tile_width = (1.0 - total_padding_x) / width as f32;
-        let tile_height = (1.0 - total_padding_y) / height as f32;
-
         for row in 0..height {
             for col in 0..width {
-                let base_x = col as f32 * (tile_width + padding_x);
-                let base_y = row as f32 * (tile_height + padding_y);
 
                 let vertices = [
-                    // Bottom-left vertex
+                    // top-left vertex
                     TilePolygonVertex {
-                        pos_lerp_x: 0.0 + padding_x,
-                        pos_lerp_y: 1.0 - padding_y,
+                        pos_lerp_x: 0.0,
+                        pos_lerp_y: 0.0,
                         text_uv_x: col as f32 / width as f32,
-                        text_uv_y: 0.0,
+                        text_uv_y: row as f32 / height as f32,
                     },
-                    // Bottom-right vertex
+                    // top-right vertex
                     TilePolygonVertex {
-                        pos_lerp_x: 1.0 - padding_x,
-                        pos_lerp_y: 1.0 - padding_y,
+                        pos_lerp_x: 1.0,
+                        pos_lerp_y: 0.0,
                         text_uv_x: (col + 1) as f32 / width as f32,
-                        text_uv_y: 0.0,
+                        text_uv_y: row as f32 / height as f32,
                     },
-                    // Top-right vertex
+                    // bottom-right vertex
                     TilePolygonVertex {
-                        pos_lerp_x: 1.0 - padding_x,
-                        pos_lerp_y: 0.0 + padding_y,
+                        pos_lerp_x: 1.0,
+                        pos_lerp_y: 1.0,
                         text_uv_x: (col + 1) as f32 / width as f32,
-                        text_uv_y: 1.0,
+                        text_uv_y: (row + 1) as f32 / height as f32,
                     },
-                    // Top-left vertex
+                    // bottom-left vertex
                     TilePolygonVertex {
-                        pos_lerp_x: 0.0 + padding_x,
-                        pos_lerp_y: 0.0 + padding_y,
+                        pos_lerp_x: 0.0,
+                        pos_lerp_y: 1.0,
                         text_uv_x: col as f32 / width as f32,
-                        text_uv_y: 1.0,
+                        text_uv_y: (row + 1) as f32 / height as f32,
                     },
                 ];
 
