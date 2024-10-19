@@ -43,7 +43,7 @@ impl GlacierResource for TextureMap {
         Ok(writer.into_inner())
     }
 
-    fn resource_type(&self) -> [u8; 4] {
+    fn resource_type() -> [u8; 4] {
         *b"TEXT"
     }
 
@@ -83,7 +83,7 @@ impl GlacierResource for MipblockData{
         self.pack_to_vec(woa_version.into()).map_err( |e| GlacierResourceError::WriteError(format!("Texd packing error: {}", e)))
     }
 
-    fn resource_type(&self) -> [u8; 4] {
+    fn resource_type() -> [u8; 4] {
         *b"TEXD"
     }
 

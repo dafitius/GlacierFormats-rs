@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Add resources to package
     let mut texture_resource = PackageResourceBuilder::from_glacier_resource(text_rrid, &texture, woa_version.into())?;
     if texture.has_mipblock1(){
-        let mipblock1 = texture.get_mipblock1().unwrap();
+        let mipblock1 = texture.mipblock1().unwrap();
         let highmip_resource = PackageResourceBuilder::from_glacier_resource(texd_rrid, &mipblock1, woa_version.into())?;
         texture_resource.with_reference(texd_rrid, ResourceReferenceFlags::Standard(ResourceReferenceFlagsStandard::new().with_reference_type(ReferenceType::WEAK)));
         package.with_resource(highmip_resource);

@@ -1,4 +1,4 @@
-use crate::enums::{Dimensions, InterpretAs, RenderFormat, RenderResourceMiscFlags, TextureType};
+use crate::enums::{Dimensions, InterpretAs, RenderFormat, TextureFlags, TextureType};
 use std::{io, slice};
 use std::cmp::max;
 use std::io::{Cursor, Read};
@@ -44,7 +44,7 @@ struct TextureMapParams {
     texture_type: TextureType,
     interpret_as: InterpretAs,
     dimensions: Dimensions,
-    flags: RenderResourceMiscFlags,
+    flags: TextureFlags,
     format: RenderFormat,
     num_mip_levels: MipLevels,
     default_mip_level: u8,
@@ -59,8 +59,8 @@ impl TextureMapParams {
             interpret_as: InterpretAs::Normal,
             dimensions: Dimensions::_2D,
 
-            flags: RenderResourceMiscFlags::default()
-                .with_no_color_compression(true),
+            flags: TextureFlags::default()
+                .with_unknown3(true),
             format,
             num_mip_levels: MipLevels::All,
             default_mip_level: 0,
@@ -156,7 +156,7 @@ impl TextureMapBuilder {
 
     pub fn with_atlas(mut self, atlas_data: AtlasData) -> Self {
         self.atlas_data = Some(atlas_data);
-        self.params.flags = self.params.flags.with_temp_alloc(true);
+        self.params.flags = self.params.flags.with_unknown_atlas(true);
         self
     }
 
@@ -165,19 +165,20 @@ impl TextureMapBuilder {
         self
     }
 
-    ///Setting this flag will make the game use the compressed pixels without decompressing first.
-    pub fn with_compressed_colors(mut self) -> Self {
-        self.params.flags = self.params.flags.with_no_color_compression(false);
-        self
-    }
-
-    pub fn with_swizzled_texture(mut self) -> Self {
-        self.params.flags = self.params.flags.with_texture_swizzled(true);
+    #[cfg(feature = "unstable")]
+    pub fn without_flag_unk3(mut self) -> Self {
+        self.params.flags = self.params.flags.with_unknown3(false);
         self
     }
 
     #[cfg(feature = "unstable")]
-    pub fn with_flags(mut self, flags: RenderResourceMiscFlags) -> Self {
+    pub fn with_flag_unk1(mut self) -> Self {
+        self.params.flags = self.params.flags.with_unknown1(true);
+        self
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn with_flags(mut self, flags: TextureFlags) -> Self {
         self.params.flags = flags;
         self
     }
@@ -289,7 +290,7 @@ impl TextureMapBuilder {
                     #[cfg(feature = "unstable")]
                     flags: self.params.flags,
                     #[cfg(not(feature = "unstable"))]
-                    flags: RenderResourceMiscFlags::default(), //detached from builder
+                    flags: TextureFlags::default(), //detached from builder
                     width,
                     height,
                     format: self.params.format,
@@ -313,7 +314,7 @@ impl TextureMapBuilder {
                     #[cfg(feature = "unstable")]
                     flags: self.params.flags,
                     #[cfg(not(feature = "unstable"))]
-                    flags: RenderResourceMiscFlags::default(), //detached from builder
+                    flags: TextureFlags::default(), //detached from builder
                     width,
                     height,
                     format: self.params.format,

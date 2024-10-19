@@ -148,30 +148,16 @@ impl From<Dimensions> for TEX_DIMENSION {
 #[derive(BinRead, BinWrite, Serialize, Deserialize)]
 //#[brw(repr = u32)]
 //most of these are unused...
-pub struct RenderResourceMiscFlags
+pub struct TextureFlags
 {
-    pub persistent_data: bool,
-    pub texture_cube: bool,         //Used on cubemaps
-    pub texture_normalmap: bool,
-    pub texture_swizzled: bool,     //Does not affect the texture in-game. Usually not enabled on non-normal/color types, or uncompressed formats
-    pub temp_alloc: bool,           //Only used on atlas textures
-    pub unused2: bool,
-    pub no_color_compression: bool, //stops texture from being stored compressed in memory
-    pub has_analysis_data: bool,
-    pub texture_srgb: bool,
-    pub force_main_mem: bool,
-    pub shared: bool,
-    pub buffer_structured: bool,
-    pub linear_data: bool,
-    pub esram_resolve_present: bool,
-    pub draw_indirect_args: bool,
-    pub no_stencil: bool,
-    pub texture_streamer: bool,
-    pub dx11afr_dont_copy: bool,
-    pub dx12afr_mgpu_visible: bool,
-    pub ms: bool,
-    pub ps4_no_h_tile: bool,
+    /* 0x1 */ swizzled: bool,
+    /* 0x2 */ pub deferred: bool,           //Only used on 4x4 textures
+    /* 0x4 */ memory_read_xbox_360: bool,
+    /* 0x8 */ pub unknown1: bool,           //Does not affect the texture in-game. Usually not enabled on non-normal/color types, or uncompressed formats
+    /* 0x10 */pub unknown_atlas: bool,           //Only used on atlas textures
+    /* 0x20 */ddsc_encoded: bool,
+    /* 0x40 */pub unknown3: bool,           //Not enabling this will corrupt most textures
 
-    #[bits(11)]
+    #[bits(25)]
     __: u32,
 }

@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     texture_resource.with_memory_requirements(0xFFFFFFFF, texture.video_memory_requirement() as u32);
 
     if texture.has_mipblock1() {
-        let mipblock1 = texture.get_mipblock1().unwrap();
+        let mipblock1 = texture.mipblock1().unwrap();
         let highmip_resource = PackageResourceBuilder::from_memory(
             texd_rrid,
             "TEXD",

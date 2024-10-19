@@ -159,7 +159,7 @@ fn main() -> Result<()> {
                 let texd_path = text_path.with_extension("TEXD");
                 fs::write(
                     &texd_path,
-                    tex.get_mipblock1()
+                    tex.mipblock1()
                         .context("Failed to retrieve TEXD data from TextureMap")?
                         .pack_to_vec(cmd.game_version)
                         .context("Failed to pack TEXD data")?,
@@ -194,7 +194,7 @@ fn main() -> Result<()> {
                 let texd_path = output_path.with_extension("TEXD");
                 fs::write(
                     &texd_path,
-                    ported_tex.get_mipblock1()
+                    ported_tex.mipblock1()
                         .context("Failed to retrieve TEXD data from ported TextureMap")?
                         .pack_to_vec(cmd.to_version)
                         .context("Failed to pack TEXD data")?,
