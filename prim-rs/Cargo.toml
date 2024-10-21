@@ -6,12 +6,12 @@ edition = "2021"
 [dependencies]
 binrw = "0.14.0"
 itertools = "0.13.0"
-bitfield-struct = "0.8.0"
+bitfield-struct = "0.9.2"
 num-traits = "0.2.19"
 obj = "0.10.2"
 bincode = "2.0.0-rc.3"
 base64 = "0.22.1"
-rpkg-rs = { version = "1.1.0", optional = true }
+rpkg-rs = { version = "1.1.2", features = ["path-list"], optional = true }
 
 [features]
 default = ["rpkg"]
