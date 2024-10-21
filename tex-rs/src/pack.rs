@@ -1,4 +1,4 @@
-use crate::enums::{Dimensions, InterpretAs, RenderFormat, TextureFlags, TextureType};
+use crate::enums::*;
 use std::{io, slice};
 use std::cmp::max;
 use std::io::{Cursor, Read};
@@ -44,7 +44,7 @@ struct TextureMapParams {
     texture_type: TextureType,
     interpret_as: InterpretAs,
     dimensions: Dimensions,
-    flags: TextureFlags,
+    flags: TextureFlagsInner,
     format: RenderFormat,
     num_mip_levels: MipLevels,
     default_mip_level: u8,
@@ -59,7 +59,7 @@ impl TextureMapParams {
             interpret_as: InterpretAs::Normal,
             dimensions: Dimensions::_2D,
 
-            flags: TextureFlags::default()
+            flags: TextureFlagsInner::default()
                 .with_unknown3(true),
             format,
             num_mip_levels: MipLevels::All,
@@ -71,6 +71,7 @@ impl TextureMapParams {
 }
 
 /// Builder struct for constructing TextureMap instances.
+/// Will enable the [`unknown3`] flag by default.
 pub struct TextureMapBuilder {
     params: TextureMapParams,
     atlas_data: Option<AtlasData>,
@@ -156,7 +157,7 @@ impl TextureMapBuilder {
 
     pub fn with_atlas(mut self, atlas_data: AtlasData) -> Self {
         self.atlas_data = Some(atlas_data);
-        self.params.flags = self.params.flags.with_unknown_atlas(true);
+        self.params.flags = self.params.flags.with_atlas(true);
         self
     }
 
@@ -165,21 +166,8 @@ impl TextureMapBuilder {
         self
     }
 
-    #[cfg(feature = "unstable")]
-    pub fn without_flag_unk3(mut self) -> Self {
-        self.params.flags = self.params.flags.with_unknown3(false);
-        self
-    }
-
-    #[cfg(feature = "unstable")]
-    pub fn with_flag_unk1(mut self) -> Self {
-        self.params.flags = self.params.flags.with_unknown1(true);
-        self
-    }
-
-    #[cfg(feature = "unstable")]
     pub fn with_flags(mut self, flags: TextureFlags) -> Self {
-        self.params.flags = flags;
+        self.params.flags = flags.inner;
         self
     }
 
@@ -194,8 +182,6 @@ impl TextureMapBuilder {
         self.params.texd_identifier = texd_id;
         self
     }
-
-
 
     ///Convert the image to a different format.
     /// It is assumed that the input image is not compressed
@@ -290,7 +276,7 @@ impl TextureMapBuilder {
                     #[cfg(feature = "unstable")]
                     flags: self.params.flags,
                     #[cfg(not(feature = "unstable"))]
-                    flags: TextureFlags::default(), //detached from builder
+                    flags: TextureFlagsInner::default(), //detached from builder
                     width,
                     height,
                     format: self.params.format,
@@ -314,7 +300,7 @@ impl TextureMapBuilder {
                     #[cfg(feature = "unstable")]
                     flags: self.params.flags,
                     #[cfg(not(feature = "unstable"))]
-                    flags: TextureFlags::default(), //detached from builder
+                    flags: TextureFlagsInner::default(), //detached from builder
                     width,
                     height,
                     format: self.params.format,

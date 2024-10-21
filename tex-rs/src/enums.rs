@@ -148,16 +148,112 @@ impl From<Dimensions> for TEX_DIMENSION {
 #[derive(BinRead, BinWrite, Serialize, Deserialize)]
 //#[brw(repr = u32)]
 //most of these are unused...
-pub struct TextureFlags
+pub(crate) struct TextureFlagsInner
 {
-    /* 0x1 */ swizzled: bool,
-    /* 0x2 */ pub deferred: bool,           //Only used on 4x4 textures
-    /* 0x4 */ memory_read_xbox_360: bool,
-    /* 0x8 */ pub unknown1: bool,           //Does not affect the texture in-game. Usually not enabled on non-normal/color types, or uncompressed formats
-    /* 0x10 */pub unknown_atlas: bool,           //Only used on atlas textures
-    /* 0x20 */ddsc_encoded: bool,
-    /* 0x40 */pub unknown3: bool,           //Not enabling this will corrupt most textures
+    /* 0x1 */ pub(crate) swizzled: bool,
+    /* 0x2 */ pub(crate) deferred: bool,           //Only used on 4x4 textures
+    /* 0x4 */ pub(crate) memory_read_xbox_360: bool,
+    /* 0x8 */ pub(crate) unknown1: bool,           //Does not affect the texture in-game. Usually not enabled on non-normal/color types, or uncompressed formats
+    /* 0x10 */pub(crate) atlas: bool,              //Only used on atlas textures
+    /* 0x20 */pub(crate) ddsc_encoded: bool,
+    /* 0x40 */pub(crate) unknown3: bool,           //Not enabling this will corrupt most textures
 
     #[bits(25)]
     __: u32,
+}
+
+pub struct TextureFlags{
+    ///inner "real" flags bitfield. Wrapped because it is likely to change over time.
+    /// Wrapping the struct makes it possible to #\[deprecated\] old getters and setters
+    pub(crate) inner: TextureFlagsInner
+}
+
+/// Flags set in the texture files.
+/// The "unstable" flags are not found in any production texture file. Use at your own risk
+/// The other flags should not crash the game, but can also result in corrupted textures, use with caution
+impl TextureFlags{
+
+    pub fn deferred(&self) -> bool { self.inner.deferred() }
+    pub fn unknown1(&self) -> bool { self.inner.unknown1() }
+    pub fn atlas(&self) -> bool { self.inner.atlas() }
+    pub fn unknown3(&self) -> bool { self.inner.unknown3() }
+
+    pub fn set_deferred(&mut self, value: bool) {
+        self.inner.set_deferred(value)
+    }
+    pub fn set_unknown1(&mut self, value: bool) {
+        self.inner.set_unknown1(value)
+    }
+    pub fn set_unknown3(&mut self, value: bool) {
+        self.inner.set_unknown3(value)
+    }
+
+    pub fn set_atlas(&mut self, value: bool) {
+    self.inner.set_atlas(value)
+    }
+    pub fn with_deferred(&self, value: bool) -> Self{
+        Self{
+            inner: self.inner.with_deferred(value)
+        }
+    }
+    pub fn with_unknown1(&mut self, value: bool) -> Self{
+        Self{
+            inner: self.inner.with_unknown1(value)
+        }
+    }
+    pub fn with_atlas(&mut self, value: bool) -> Self{
+        Self{
+            inner: self.inner.with_atlas(value)
+        }
+    }
+    pub fn with_unknown3(&mut self, value: bool) -> Self{
+        Self{
+            inner: self.inner.with_unknown3(value)
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn swizzled(&self) -> bool { self.inner.swizzled() }
+
+    #[cfg(feature = "unstable")]
+    pub fn memory_read_xbox_360(&self) -> bool { self.inner.memory_read_xbox_360() }
+
+    #[cfg(feature = "unstable")]
+    pub fn ddsc_encoded(&self) -> bool { self.inner.ddsc_encoded() }
+
+    #[cfg(feature = "unstable")]
+    pub fn set_swizzled(&mut self, value: bool) {
+        self.inner.set_swizzled(value)
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn set_memory_read_xbox_360(&mut self, value: bool) {
+        self.inner.set_memory_read_xbox_360(value)
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn set_ddsc_encoded(&mut self, value: bool) {
+        self.inner.set_ddsc_encoded(value)
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn with_swizzled(&self, value: bool) -> Self {
+        Self {
+            inner: self.inner.with_swizzled(value),
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn with_memory_read_xbox_360(&self, value: bool) -> Self {
+        Self {
+            inner: self.inner.with_memory_read_xbox_360(value),
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn with_ddsc_encoded(&self, value: bool) -> Self {
+        Self {
+            inner: self.inner.with_ddsc_encoded(value),
+        }
+    }
 }

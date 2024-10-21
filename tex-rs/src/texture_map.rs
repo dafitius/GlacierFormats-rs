@@ -71,7 +71,7 @@ pub(crate) struct TextureMapHeaderV1 {
     #[br(temp)]
     #[bw(calc(args.data_size - 8))]
     data_size: u32,
-    pub(crate) flags: TextureFlags,
+    pub(crate) flags: TextureFlagsInner,
     pub(crate) width: u16,
     pub(crate) height: u16,
     pub(crate) format: RenderFormat,
@@ -153,7 +153,7 @@ pub(crate) struct TextureMapHeaderV2 {
     #[br(temp)]
     #[bw(calc(args.data_size))]
     data_size: u32,
-    pub(crate) flags: TextureFlags,
+    pub(crate) flags: TextureFlagsInner,
     pub(crate) width: u16,
     pub(crate) height: u16,
     pub(crate) format: RenderFormat,
@@ -239,7 +239,7 @@ pub(crate) struct TextureMapHeaderV3 {
     #[br(temp)]
     #[bw(calc(args.data_size))]
     data_size: u32,
-    pub(crate) flags: TextureFlags,
+    pub(crate) flags: TextureFlagsInner,
     pub(crate) width: u16,
     pub(crate) height: u16,
     pub(crate) format: RenderFormat,
@@ -642,9 +642,9 @@ impl TextureMap {
 
     pub fn flags(&self) -> TextureFlags {
         match &self.inner {
-            TextureMapVersion::V1(tex) => {tex.header.flags}
-            TextureMapVersion::V2(tex) => {tex.header.flags}
-            TextureMapVersion::V3(tex) => {tex.header.flags}
+            TextureMapVersion::V1(tex) => {TextureFlags{inner: tex.header.flags}}
+            TextureMapVersion::V2(tex) => {TextureFlags{inner: tex.header.flags}}
+            TextureMapVersion::V3(tex) => {TextureFlags{inner: tex.header.flags}}
         }
     }
 
