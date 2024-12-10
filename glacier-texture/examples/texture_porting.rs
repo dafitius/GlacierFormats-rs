@@ -7,12 +7,12 @@ use rpkg_rs::resource::pdefs::{PartitionId, PartitionType};
 use rpkg_rs::resource::resource_package::{PackageVersion, ReferenceType, ResourceReferenceFlags, ResourceReferenceFlagsStandard};
 use rpkg_rs::resource::resource_partition::PatchId;
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
-use tex_rs::enums::{InterpretAs, RenderFormat, TextureType};
-use tex_rs::mipblock::MipblockData;
-use tex_rs::pack::MipFilter::Linear;
-use tex_rs::pack::TextureMapBuilder;
-use tex_rs::texture_map::TextureMap;
-use tex_rs::WoaVersion;
+use glacier_texture::enums::{InterpretAs, RenderFormat, TextureType};
+use glacier_texture::mipblock::MipblockData;
+use glacier_texture::pack::MipFilter::Linear;
+use glacier_texture::pack::TextureMapBuilder;
+use glacier_texture::texture_map::TextureMap;
+use glacier_texture::WoaVersion;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 

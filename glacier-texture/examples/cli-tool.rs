@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use binrw::BinRead;
 use clap::{Args, Parser, Subcommand};
-use tex_rs::convert;
-use tex_rs::mipblock::MipblockData;
-use tex_rs::pack::TextureMapBuilder;
-use tex_rs::texture_map::TextureMap;
-use tex_rs::WoaVersion;
+use glacier_texture::convert;
+use glacier_texture::mipblock::MipblockData;
+use glacier_texture::pack::TextureMapBuilder;
+use glacier_texture::texture_map::TextureMap;
+use glacier_texture::WoaVersion;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

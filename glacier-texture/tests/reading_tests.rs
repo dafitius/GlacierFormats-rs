@@ -7,9 +7,9 @@ use rpkg_rs::GlacierResourceError;
 use rpkg_rs::resource::partition_manager::PartitionManager;
 use rpkg_rs::resource::pdefs::{GamePaths, PackageDefinitionSource};
 
-use tex_rs::texture_map::{TextureMap};
-use tex_rs::{convert, WoaVersion};
-use tex_rs::pack::TexturePacker;
+use glacier_texture::texture_map::{TextureMap};
+use glacier_texture::{convert, WoaVersion};
+use glacier_texture::mipblock::MipblockData;
 
 #[test]
 #[ignore]
@@ -106,7 +106,7 @@ fn read_all_text_texd_in_game(woa_version: rpkg_rs::WoaVersion, game_paths: Game
                     Ok(mut texture_map) => {
                         if let Some(texd_ref) = resource.references().get(0) {
                             let texd_data = package_manager.read_resource_from(partition.partition_info().id(), texd_ref.0).map_err(|e| GlacierResourceError::ReadError(e.to_string())).unwrap();
-                            texture_map.set_mipblock1_raw(&texd_data, woa_version.into()).unwrap();
+                            texture_map.set_mipblock1(MipblockData::from_memory(&texd_data, woa_version.into()).unwrap());
                         }
                     }
                     Err(e) => {

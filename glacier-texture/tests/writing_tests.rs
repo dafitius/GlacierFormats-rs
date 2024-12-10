@@ -7,10 +7,11 @@ use directxtex::{DDS_FLAGS, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_
 use rpkg_rs::{GlacierResource, GlacierResourceError};
 use rpkg_rs::resource::partition_manager::PartitionManager;
 use rpkg_rs::resource::pdefs::{GamePaths, PackageDefinitionSource};
-
-use tex_rs::texture_map::{TextureMap};
-use tex_rs::{convert, WoaVersion};
-use tex_rs::pack::TexturePacker;
+use serde::Serialize;
+use glacier_texture::texture_map::{TextureMap};
+use glacier_texture::{convert, WoaVersion};
+use glacier_texture::mipblock::MipblockData;
+use glacier_texture::pack::TextureMapBuilder;
 
 #[test]
 #[ignore]
@@ -110,10 +111,10 @@ fn write_all_text_texd_in_game(woa_version: rpkg_rs::WoaVersion, game_paths: Gam
                 if let Ok(mut texture_map) = TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version),)) {
                     if let Some(texd_ref) = resource.references().get(0) {
                         texd_data = package_manager.read_resource_from(partition.partition_info().id(), texd_ref.0).map_err(|e| GlacierResourceError::ReadError(e.to_string())).unwrap();
-                        texture_map.set_mipblock1_raw(&texd_data, woa_version.into()).unwrap();
+                        texture_map.set_mipblock1(MipblockData::from_memory(&texd_data, woa_version.into()).unwrap());
                     }
-                    let packer = TexturePacker::new_from_texture_map(texture_map.clone());
-                    let vec = packer.pack_to_vec().unwrap();
+                    let packer = TextureMapBuilder::from_texture_map(&texture_map).unwrap();
+                    let vec = packer.build(woa_version.into()).unwrap().serialize().unwrap();
 
                     // if (data != vec){
                     //     fs::write(format!("./{}.TEXT",resource.rrid()), data.clone()).unwrap();
