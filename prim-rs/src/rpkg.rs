@@ -14,7 +14,7 @@ impl GlacierResource for RenderPrimitive {
         todo!()
     }
 
-    fn resource_type(&self) -> [u8; 4] {
+    fn resource_type() -> [u8; 4] {
         todo!()
     }
 
@@ -27,6 +27,10 @@ impl GlacierResource for RenderPrimitive {
     }
 
     fn should_scramble(&self) -> bool {
+        todo!()
+    }
+
+    fn should_compress(&self) -> bool {
         todo!()
     }
 }
