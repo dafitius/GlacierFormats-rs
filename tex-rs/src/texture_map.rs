@@ -187,7 +187,7 @@ impl TextureMapHeaderImpl for TextureMapHeaderV2 {
             return 0;
         }
 
-        if self.format == RenderFormat::DXT1 && (self.width as usize * self.height as usize) == 16 {
+        if self.format == RenderFormat::BC1 && (self.width as usize * self.height as usize) == 16 {
             return 1;
         }
 
@@ -295,7 +295,7 @@ impl TextureMapHeaderImpl for TextureMapHeaderV3 {
             return 0;
         }
 
-        if self.format == RenderFormat::DXT1 && (self.width as usize * self.height as usize) == 16 {
+        if self.format == RenderFormat::BC1 && (self.width as usize * self.height as usize) == 16 {
             return 1;
         }
 

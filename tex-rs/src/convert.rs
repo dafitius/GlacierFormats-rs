@@ -79,7 +79,7 @@ fn decompress_dds(tex: &TextureMap, scratch_image: ScratchImage) -> Result<Scrat
     }
 
     if tex.format() == RenderFormat::R16G16B16A16 {
-        scratch_image = directxtex::convert(scratch_image.images(), scratch_image.metadata(), DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT).map_err(DirectXTexError)?;
+        scratch_image = directxtex::convert(scratch_image.images(), scratch_image.metadata(), DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM , TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC, TEX_THRESHOLD_DEFAULT).map_err(DirectXTexError)?;
     }
 
     //generate missing blue channel

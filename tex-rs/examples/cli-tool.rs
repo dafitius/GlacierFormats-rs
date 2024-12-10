@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use binrw::BinRead;
 use clap::{Args, Parser, Subcommand};
 use tex_rs::convert;
+use tex_rs::mipblock::MipblockData;
 use tex_rs::pack::TextureMapBuilder;
 use tex_rs::texture_map::TextureMap;
 use tex_rs::WoaVersion;
@@ -217,14 +218,14 @@ fn read_texture(cmd: &ConvertTextureMap, silent: bool) -> Result<TextureMap> {
     let input_data = fs::read(&cmd.input_path)
         .with_context(|| format!("Failed to read input TEXT file at {:?}", cmd.input_path))?;
 
-    let mut tex = TextureMap::from_memory(input_data, cmd.game_version)
+    let mut tex = TextureMap::from_memory(&input_data, cmd.game_version)
         .context("Failed to parse the TEXT file into TextureMap")?;
 
     if let Some(texd_path) = &cmd.texd_path {
         let texd_data = fs::read(texd_path)
             .with_context(|| format!("Failed to read TEXD file at {:?}", texd_path))?;
-        tex.set_mipblock1_raw(&texd_data, cmd.game_version)
-            .context("Failed to apply TEXD data to TextureMap")?;
+        tex.set_mipblock1(MipblockData::from_memory(&texd_data, cmd.game_version).context("Failed to apply TEXD data to TextureMap")?);
+
     }
 
     if !silent {
@@ -247,15 +248,14 @@ fn read_texture_port(cmd: &PortTextureMap) -> Result<TextureMap> {
     let input_data = fs::read(&cmd.input_path)
         .with_context(|| format!("Failed to read input TEXT file at {:?}", cmd.input_path))?;
 
-    let tex = TextureMap::from_memory(input_data, cmd.from_version)
+    let tex = TextureMap::from_memory(&input_data, cmd.from_version)
         .context("Failed to parse the TEXT file into TextureMap")?;
 
     if let Some(texd_path) = &cmd.texd_path {
         let texd_data = fs::read(texd_path)
             .with_context(|| format!("Failed to read TEXD file at {:?}", texd_path))?;
         let mut tex_with_texd = tex.clone();
-        tex_with_texd.set_mipblock1_raw(&texd_data, cmd.from_version)
-            .context("Failed to apply TEXD data to TextureMap")?;
+        tex_with_texd.set_mipblock1(MipblockData::from_memory(&texd_data, cmd.from_version).context("Failed to apply TEXD data to TextureMap")?);
         Ok(tex_with_texd)
     } else {
         Ok(tex)

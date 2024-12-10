@@ -45,31 +45,22 @@ pub enum InterpretAs
 pub enum RenderFormat
 {
     R16G16B16A16 = 0x0A,
-
     R8G8B8A8 = 0x1C,
-    //Normals. very rarely used. Legacy? Only one such tex in chunk0;
     R8G8 = 0x34,
-    //8-bit grayscale uncompressed. Not used on models?? Overlays
     A8 = 0x42,
-    //Color maps, 1-bit alpha (mask). Many uses, color, normal, spec, rough maps on models and decals. Also used as masks.
-    DXT1 = 0x49,
-
-    DXT3 = 0x4C,
-    //Packed color, full alpha. Similar use as DXT5.
-    DXT5 = 0x4F,
-    //8-bit grayscale. Few or no direct uses on models?
+    BC1 = 0x49,
+    BC2 = 0x4C,
+    BC3 = 0x4F,
     BC4 = 0x52,
-    //2-channel normal maps
     BC5 = 0x55,
-    //hi-res color + full alpha. Used for pretty much everything...
     BC7 = 0x5A,
 }
 
 impl RenderFormat {
     pub fn is_compressed(&self) -> bool {
-        matches!(self, RenderFormat::DXT1|
-            RenderFormat::DXT3|
-            RenderFormat::DXT5|
+        matches!(self, RenderFormat::BC1|
+            RenderFormat::BC2|
+            RenderFormat::BC3|
             RenderFormat::BC4|
             RenderFormat::BC5|
             RenderFormat::BC7)
@@ -79,11 +70,11 @@ impl RenderFormat {
         match self {
             RenderFormat::A8 | RenderFormat::BC4 => 1,
             RenderFormat::R8G8 | RenderFormat::BC5 => 2,
-            RenderFormat::DXT1 | //assume DXT1a
+            RenderFormat::BC1 | //assume DXT1a
             RenderFormat::R16G16B16A16 |
             RenderFormat::R8G8B8A8 |
-            RenderFormat::DXT3 |
-            RenderFormat::DXT5 |
+            RenderFormat::BC2 |
+            RenderFormat::BC3 |
             RenderFormat::BC7 => 4,
         }
     }
@@ -92,13 +83,13 @@ impl RenderFormat {
 impl From<RenderFormat> for DXGI_FORMAT {
     fn from(value: RenderFormat) -> Self {
         match value {
-            RenderFormat::R16G16B16A16 => { DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_UNORM }
+            RenderFormat::R16G16B16A16 => { DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_FLOAT } // has to be float
             RenderFormat::R8G8B8A8 => { DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM }
             RenderFormat::R8G8 => { DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM }
             RenderFormat::A8 => { DXGI_FORMAT::DXGI_FORMAT_A8_UNORM }
-            RenderFormat::DXT1 => { DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM }
-            RenderFormat::DXT3 => { DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM }
-            RenderFormat::DXT5 => { DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM }
+            RenderFormat::BC1 => { DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM }
+            RenderFormat::BC2 => { DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM }
+            RenderFormat::BC3 => { DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM }
             RenderFormat::BC4 => { DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM }
             RenderFormat::BC5 => { DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM }
             RenderFormat::BC7 => { DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM }
@@ -113,9 +104,9 @@ impl From<DXGI_FORMAT> for RenderFormat {
             DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM => RenderFormat::R8G8B8A8,
             DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM => RenderFormat::R8G8,
             DXGI_FORMAT::DXGI_FORMAT_A8_UNORM => RenderFormat::A8,
-            DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM => RenderFormat::DXT1,
-            DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM => RenderFormat::DXT3,
-            DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM => RenderFormat::DXT5,
+            DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM => RenderFormat::BC1,
+            DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM => RenderFormat::BC2,
+            DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM => RenderFormat::BC3,
             DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM => RenderFormat::BC4,
             DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM => RenderFormat::BC5,
             DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => RenderFormat::BC7,

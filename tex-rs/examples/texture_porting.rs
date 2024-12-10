@@ -8,6 +8,7 @@ use rpkg_rs::resource::resource_package::{PackageVersion, ReferenceType, Resourc
 use rpkg_rs::resource::resource_partition::PatchId;
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use tex_rs::enums::{InterpretAs, RenderFormat, TextureType};
+use tex_rs::mipblock::MipblockData;
 use tex_rs::pack::MipFilter::Linear;
 use tex_rs::pack::TextureMapBuilder;
 use tex_rs::texture_map::TextureMap;
@@ -16,7 +17,6 @@ use tex_rs::WoaVersion;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Parameters
-    let tga_path = PathBuf::from("./target/texture.tga");
     let text_rrid = RuntimeResourceID::from_hex_string("000210D1CF04E4E4")?;
     let texd_rrid = RuntimeResourceID::from_hex_string("00752CEA9F76AB7E")?;
     let woa_version = WoaVersion::HM3;
@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let texd_data = fs::read("./target/00EFBDEB0ED40D59.TEXD")?;
 
     let mut old_texture = TextureMap::from_memory(text_data.as_slice(), WoaVersion::HM2)?;
-    old_texture.set_mipblock1_raw(&texd_data, WoaVersion::HM2)?;
+    old_texture.set_mipblock1(MipblockData::from_memory(&texd_data, WoaVersion::HM2)?);
 
     let partition_id : PartitionId = "chunk12".parse().unwrap();
     let patch_id : PatchId = PatchId::Patch(5);
@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         TextureMapBuilder::from_texture_map(&old_texture)?
             .with_mip_filter(Linear)
             .with_mipblock1(add_texd)
-            .with_format(RenderFormat::DXT1).build(woa_version)?;
+            .with_format(RenderFormat::BC1).build(woa_version)?;
 
     //Add resources to package
     let mut texture_resource = PackageResourceBuilder::from_glacier_resource(text_rrid, &texture, woa_version.into())?;

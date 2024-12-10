@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .texture_type(TextureType::Colour)
             .with_mip_filter(Linear)
             .with_mipblock1(add_texd)
-            .with_format(RenderFormat::DXT1).build(woa_version)?;
+            .with_format(RenderFormat::BC1).build(woa_version)?;
 
     //Add resources to package
     let mut texture_resource = PackageResourceBuilder::from_glacier_resource(text_rrid, &texture, woa_version.into())?;

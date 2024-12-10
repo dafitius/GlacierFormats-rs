@@ -1,3 +1,4 @@
+use core::mem::size_of;
 use binrw::binrw;
 use serde::{Deserialize, Serialize};
 
