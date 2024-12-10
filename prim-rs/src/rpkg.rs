@@ -22,10 +22,6 @@ impl GlacierResource for RenderPrimitive {
         todo!()
     }
 
-    fn should_compress(&self) -> bool {
-        todo!()
-    }
-
     fn video_memory_requirement(&self) -> u64 {
         todo!()
     }
@@ -35,6 +31,10 @@ impl GlacierResource for RenderPrimitive {
     }
 
     fn should_scramble(&self) -> bool {
+        todo!()
+    }
+
+    fn should_compress(&self) -> bool {
         todo!()
     }
 }
