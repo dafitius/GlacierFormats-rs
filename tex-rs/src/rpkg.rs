@@ -6,26 +6,16 @@ use crate::pack::TexturePackerError;
 use crate::texture_map::TextureMap;
 use crate::WoaVersion;
 
-
 impl From<rpkg_rs::WoaVersion> for WoaVersion {
     fn from(value: rpkg_rs::WoaVersion) -> Self {
         match value {
-            rpkg_rs::WoaVersion::HM2016 => { WoaVersion::HM2016 }
-            rpkg_rs::WoaVersion::HM2 => { WoaVersion::HM2 }
-            rpkg_rs::WoaVersion::HM3 => { WoaVersion::HM3 }
+            rpkg_rs::WoaVersion::HM2016 => WoaVersion::HM2016,
+            rpkg_rs::WoaVersion::HM2 => WoaVersion::HM2,
+            rpkg_rs::WoaVersion::HM3 => WoaVersion::HM3,
         }
     }
 }
 
-impl From<WoaVersion> for rpkg_rs::WoaVersion{
-    fn from(value: WoaVersion) -> Self {
-        match value {
-            WoaVersion::HM2016 => { rpkg_rs::WoaVersion::HM2016 }
-            WoaVersion::HM2 => { rpkg_rs::WoaVersion::HM2 }
-            WoaVersion::HM3 => { rpkg_rs::WoaVersion::HM3 }
-        }
-    }
-}
 
 impl GlacierResource for TextureMap {
     type Output = TextureMap;

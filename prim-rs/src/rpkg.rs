@@ -5,9 +5,13 @@ use crate::render_primitive::RenderPrimitive;
 impl GlacierResource for RenderPrimitive {
     type Output = RenderPrimitive;
 
-    fn process_data<R: AsRef<[u8]>>(_: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
+    fn process_data<R: AsRef<[u8]>>(
+        _: rpkg_rs::WoaVersion,
+        data: R,
+    ) -> Result<Self::Output, GlacierResourceError> {
         let mut stream = Cursor::new(data);
-        RenderPrimitive::parse_bytes(&mut stream).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
+        RenderPrimitive::parse_bytes(&mut stream)
+            .map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
     fn serialize(&self, woa_version: WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
@@ -15,6 +19,10 @@ impl GlacierResource for RenderPrimitive {
     }
 
     fn resource_type() -> [u8; 4] {
+        todo!()
+    }
+
+    fn should_compress(&self) -> bool {
         todo!()
     }
 
@@ -27,10 +35,6 @@ impl GlacierResource for RenderPrimitive {
     }
 
     fn should_scramble(&self) -> bool {
-        todo!()
-    }
-
-    fn should_compress(&self) -> bool {
         todo!()
     }
 }
