@@ -1,6 +1,6 @@
-use std::io::Cursor;
-use rpkg_rs::{GlacierResource, GlacierResourceError, WoaVersion};
 use crate::render_primitive::RenderPrimitive;
+use rpkg_rs::{GlacierResource, GlacierResourceError, WoaVersion};
+use std::io::Cursor;
 
 impl GlacierResource for RenderPrimitive {
     type Output = RenderPrimitive;
