@@ -11,7 +11,7 @@ The crates in this workspace facilitate reading and writing of these formats.
 
 #### Supported File Formats:
 - RenderPrimitive ([PRIM](prim-rs)) files, containing mesh, hitbox and cloth data. [experimental]
-- TextureMap and MipblockData ([TEXT and TEXD](tex-rs)) files, containg texture data.
+- TextureMap and MipblockData ([TEXT and TEXD](glacier-texture)) files, containg texture data.
 
 #### Optional rpkg-rs support
 `rpkg-rs` aims to streamline the process of working with Hitman game resources, offering a robust set of features to read ResourcePackage files.
