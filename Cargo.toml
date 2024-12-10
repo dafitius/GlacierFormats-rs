@@ -6,6 +6,5 @@ members = [
     "tex-rs",
 
     #new crate impl
-    "glacier-texture",
-    "glacier-geometry"
+    "glacier-texture"
 ]
