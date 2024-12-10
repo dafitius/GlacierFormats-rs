@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+#[deprecated(note = "tex-rs has been deprecated and will be removed soon, please use the glacier-texture crate")]
 pub mod texture_map;
 
 #[cfg(feature = "rpkg")]
