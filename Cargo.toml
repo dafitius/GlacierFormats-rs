@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+    #old crate impl
     "prim-rs",
-    "tex-rs"
+    "tex-rs",
+
+    #new crate impl
+    "glacier-texture"
 ]

@@ -1,11 +1,14 @@
 use std::str::FromStr;
 
-#[deprecated(note = "tex-rs has been deprecated and will be removed soon, please use the glacier-texture crate")]
 pub mod texture_map;
 
 #[cfg(feature = "rpkg")]
 pub mod rpkg;
 pub mod convert;
+pub mod pack;
+pub mod enums;
+pub mod mipblock;
+pub mod atlas;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum WoaVersion {

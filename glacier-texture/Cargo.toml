@@ -1,0 +1,25 @@
+[package]
+name = "glacier-texture"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+directxtex = "1.0.0"
+binrw = "0.14.1"
+bitfield-struct = "0.9.3"
+lz4 = "1.28.0"
+thiserror = "2.0.6"
+serde = { version = "1.0.215", features = ["serde_derive"]}
+
+rpkg-rs = { version = "1.1.2", features = ["path-list"], optional = true }
+
+[dev-dependencies]
+clap = { version = "4.5.23", features = ["derive"] }
+walkdir = "2.5.0"
+serde_json = "1.0.133"
+anyhow = "1.0.94"
+
+[features]
+default = ["rpkg"]
+rpkg = ["dep:rpkg-rs"]
+unstable = []
