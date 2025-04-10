@@ -1,6 +1,7 @@
 use std::io::{Seek, Write};
 use binrw::{BinRead, binread, BinResult, BinWrite, BinWriterExt, Endian, binrw};
-use crate::render_primitive::{align_writer, PrimPropertyFlags};
+use crate::render_primitive::{PrimPropertyFlags};
+use crate::utils::io::align_writer;
 use crate::utils::math::{BoundingBox, Vector3};
 
 

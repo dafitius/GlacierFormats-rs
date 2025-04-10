@@ -1,3 +1,4 @@
+use crate::utils::io::align_writer;
 use std::io::{Seek, SeekFrom, Write};
 use binrw::{binread, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
 use byte_slice_cast::{AsByteSlice, AsSliceOf};
@@ -5,7 +6,7 @@ use itertools::{izip, Either};
 use wide::f32x4;
 use crate::mesh::prim_sub_mesh::PrimSubMesh;
 use crate::model::prim_object::PrimObject;
-use crate::render_primitive::{align_writer, PrimPropertyFlags};
+use crate::render_primitive::{PrimPropertyFlags};
 use crate::utils::buffer::{IndexBuffer, Vertex, VertexWeights};
 use crate::utils::math::{BoundingBox, Color, Vector2, Vector3, Vector4};
 

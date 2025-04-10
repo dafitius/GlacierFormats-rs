@@ -1,4 +1,5 @@
 
+use crate::utils::io::align_writer;
 use std::{fs, io};
 use std::io::{Cursor, Read, Seek, Write};
 use std::path::{Path};
@@ -505,10 +506,4 @@ fn parse_objects(object_count: u32, global_properties: PrimPropertyFlags) -> Bin
 
     reader.seek(SeekFrom::Start(saved_pos))?;
     Ok(objects)
-}
-
-pub fn align_writer<W: Write + Seek>(writer: &mut W, num: usize) -> Result<(), io::Error> {
-    let padding = (num - (writer.stream_position()? as usize % num)) % num;
-    writer.write_all(vec![0; padding].as_slice())?;
-    Ok(())
 }

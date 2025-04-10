@@ -1,11 +1,12 @@
 
+use crate::utils::io::align_writer;
 use std::io::{Seek, SeekFrom, Write};
 use binrw::{binread, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
 use crate::cloth::cloth::ClothSimMesh;
 use crate::collision::collision::{BoxColi, Collision};
 use crate::model::prim_mesh::PrimMesh;
 use crate::model::prim_object::{ObjectPropertyFlags, PrimObject};
-use crate::render_primitive::{align_writer, PrimPropertyFlags};
+use crate::render_primitive::{PrimPropertyFlags};
 use crate::utils::buffer;
 use crate::utils::buffer::{IndexBuffer, VertexBuffers};
 use crate::utils::math::{BoundingBox, Vector2, Vector3, Vector4};

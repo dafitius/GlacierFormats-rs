@@ -12,8 +12,10 @@ obj = "0.10.2"
 bincode = "2.0.0-rc.3"
 byte-slice-cast = { version = "1.2.2"}
 wide = { version = "0.7.30"}
-rpkg-rs = { version = "1.1.2", optional = true }
+rpkg-rs = { version = "1.2.0", optional = true }
 bit-set = "0.8.0"
+nalgebra = "0.33.2"
+thiserror = "2.0.11"
 
 [features]
 default = ["rpkg"]
