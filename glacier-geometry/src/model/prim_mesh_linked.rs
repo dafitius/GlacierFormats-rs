@@ -1,12 +1,13 @@
+use crate::utils::io::align_writer;
 use crate::model::prim_object::PrimObject;
 use crate::utils::math::Vector4;
-use crate::render_primitive::align_writer;
 use crate::mesh::prim_sub_mesh::PrimSubMesh;
 use crate::render_primitive::PrimPropertyFlags;
 use crate::model::prim_mesh::PrimMesh;
 use std::io::{Read, Seek, Write};
 use binrw::{binread, BinRead, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
 use bit_set::BitSet;
+use itertools::Itertools;
 use crate::model::prim_mesh_weighted::{BoneAccel, BoneIndices, CopyBones, PrimMeshWeighted};
 
 #[binread]
@@ -57,8 +58,7 @@ fn bitset_to_bytes(bitset: &BitSet) -> BinResult<Vec<u8>> {
     let mut buffer = vec![];
     let bit_vec = bitset.clone().into_bit_vec();
     let size = bit_vec.len();
-    let aligned_size = (size + 63) / 64;
-
+    let aligned_size = ((size + 63) / 64) + size;
     let mut values = vec![0u64; (aligned_size + 63) / 64];
 
     for (i, bit) in bit_vec.iter().enumerate() {
@@ -69,12 +69,24 @@ fn bitset_to_bytes(bitset: &BitSet) -> BinResult<Vec<u8>> {
         }
     }
 
-    for value in values {
-        buffer.write_all(&value.to_le_bytes())?;
+    for value in values.iter().rev() {
+        let reversed_value = reverse_u64_bits(*value);
+        buffer.write_all(&reversed_value.to_le_bytes())?;
     }
 
     Ok(buffer)
 }
+
+fn reverse_u64_bits(mut value: u64) -> u64 {
+    let mut reversed = 0u64;
+    for _ in 0..64 {
+        reversed <<= 1;
+        reversed |= value & 1;
+        value >>= 1;
+    }
+    reversed
+}
+
 
 
 #[binread]
@@ -87,11 +99,15 @@ pub struct BoneInfo
     #[br(temp)]
     pub num_blocks: u16,
 
-    #[br(temp)]
+    // #[br(temp)]
     pub total_chunks_align: u32,
 
-    #[br(parse_with = parse_bone_remap, args(total_chunks_align))]
-    pub bone_remap: BitSet,
+    // #[br(parse_with = parse_bone_remap, args(total_chunks_align))]
+    // #[br(dbg)]
+    // pub bone_remap: BitSet,
+
+    #[br(count = (total_chunks_align + 63) / 64)]
+    pub bone_remap: Vec<u64>,
 
     #[br(little, count = num_blocks)]
     pub accel_entries: Vec<BoneAccel>,
@@ -103,16 +119,19 @@ impl BinWrite for BoneInfo {
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
         *args = writer.stream_position()? as u32;
 
-        let bit_vec = self.bone_remap.clone().into_bit_vec();
-        let size : u32 = bit_vec.len() as u32;
-        let aligned_size: u32 = ((size + 63) / 64);
+        // let bit_vec = self.bone_remap.clone().into_bit_vec();
+        // let size : u32 = bit_vec.len() as u32;
+        // let aligned_size: u32 = ((size + 63) / 64);
 
-        let total_size = 0x8 /* header size */ + (aligned_size * size_of::<u64>() as u32) + (self.accel_entries.len() * size_of::<BoneAccel>()) as u32;
+        // let total_size = 0x8 /* header size */ + (aligned_size * size_of::<u64>() as u32) + (self.accel_entries.len() * size_of::<BoneAccel>()) as u32;
+        let total_size = 0x8 /* header size */ + (self.bone_remap.len() * size_of::<u64>()) + (self.accel_entries.len() * size_of::<BoneAccel>());
 
         (total_size as u16).write_options(writer, endian, ())?;
         (self.accel_entries.len() as u16).write_options(writer, endian, ())?;
-        size.write_options(writer, endian, ())?;
-        bitset_to_bytes(&self.bone_remap)?.write_options(writer, endian, ())?;
+        // size.write_options(writer, endian, ())?;
+        self.total_chunks_align.write_options(writer, endian, ())?;
+        self.bone_remap.write_options(writer, endian, ())?;
+        // bitset_to_bytes(&self.bone_remap)?.write_options(writer, endian, ())?;
         for entry in &self.accel_entries {
             entry.write_options(writer, endian, ())?;
         }
@@ -160,14 +179,14 @@ impl BinWrite for PrimMeshLinked {
 
 
 impl PrimMeshLinked {
-    pub fn get_indices_for_bone(&self, bone_index: usize) -> Option<Vec<u16>>{
-        if self.bone_info.bone_remap.get_ref().get(bone_index)? {
-            let entry_index = self.bone_info.bone_remap.get_ref().iter().enumerate().filter(|(i, b)| i <= &bone_index && *b).count();
-            let accel_entry = self.bone_info.accel_entries.get(entry_index)?;
-            let indices = (0..accel_entry.num_indices as usize).map(|i| self.prim_mesh.sub_mesh.indices.get(accel_entry.offset as usize + i)).flatten().copied().collect::<Vec<_>>();
-            Some(indices)
-        } else {
-            None
-        }
-    }
+    // pub fn get_indices_for_bone(&self, bone_index: usize) -> Option<Vec<u16>>{
+    //     if self.bone_info.bone_remap.get_ref().get(bone_index)? {
+    //         let entry_index = self.bone_info.bone_remap.get_ref().iter().enumerate().filter(|(i, b)| i <= &bone_index && *b).count();
+    //         let accel_entry = self.bone_info.accel_entries.get(entry_index)?;
+    //         let indices = (0..accel_entry.num_indices as usize).map(|i| self.prim_mesh.sub_mesh.indices.get(accel_entry.offset as usize + i)).flatten().copied().collect::<Vec<_>>();
+    //         Some(indices)
+    //     } else {
+    //         None
+    //     }
+    // }
 }

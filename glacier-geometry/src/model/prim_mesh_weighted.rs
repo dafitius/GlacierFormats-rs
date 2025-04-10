@@ -1,6 +1,6 @@
+use crate::utils::io::align_writer;
 use crate::model::prim_object::PrimObject;
 use crate::utils::math::Vector4;
-use crate::render_primitive::align_writer;
 use crate::mesh::prim_sub_mesh::PrimSubMesh;
 use crate::render_primitive::PrimPropertyFlags;
 use crate::model::prim_mesh::PrimMesh;
