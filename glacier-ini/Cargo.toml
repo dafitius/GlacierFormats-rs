@@ -1,0 +1,24 @@
+[package]
+name = "glacier-ini"
+version = "1.0.0"
+edition = "2021"
+license = "Apache-2.0"
+categories = ["game-development", "data-structures", "parser-implementations"]
+keywords = ["texture", "hitman", "glacier", "modding"]
+description = "Read and write Glacier Ini files"
+repository = "https://github.com/dafitius/glacierformats-rs"
+
+[badges.maintenance]
+status = "actively-developed"
+
+[dependencies]
+thiserror = "2.0.12"
+indexmap = "2.10.0"
+itertools = "0.14.0"
+pathdiff = "0.2.3"
+byteorder = "1.5.0"
+extended-tea = "0.1.1"
+crc32fast = "1.4.2"
+
+[dev-dependencies]
+
