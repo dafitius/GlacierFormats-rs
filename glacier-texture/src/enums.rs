@@ -2,6 +2,7 @@ use binrw::{BinRead, BinWrite};
 use bitfield_struct::bitfield;
 use directxtex::{DXGI_FORMAT, TEX_DIMENSION};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 #[derive(BinRead, BinWrite, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Default)]
 #[brw(repr = u16)]
@@ -97,20 +98,26 @@ impl From<RenderFormat> for DXGI_FORMAT {
     }
 }
 
-impl From<DXGI_FORMAT> for RenderFormat {
-    fn from(value: DXGI_FORMAT) -> Self {
+#[derive(Debug, Error)]
+#[error("Unsupported DXGI_FORMAT")]
+pub struct UnsupportedFormatError;
+
+impl TryFrom<DXGI_FORMAT> for RenderFormat {
+    type Error = UnsupportedFormatError;
+
+    fn try_from(value: DXGI_FORMAT) -> Result<Self, Self::Error> {
         match value {
-            DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_UNORM => RenderFormat::R16G16B16A16,
-            DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM => RenderFormat::R8G8B8A8,
-            DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM => RenderFormat::R8G8,
-            DXGI_FORMAT::DXGI_FORMAT_A8_UNORM => RenderFormat::A8,
-            DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM => RenderFormat::BC1,
-            DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM => RenderFormat::BC2,
-            DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM => RenderFormat::BC3,
-            DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM => RenderFormat::BC4,
-            DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM => RenderFormat::BC5,
-            DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => RenderFormat::BC7,
-            _ => panic!("Unsupported DXGI_FORMAT: {:?}", value),
+            DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_UNORM => Ok(RenderFormat::R16G16B16A16),
+            DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM => Ok(RenderFormat::R8G8B8A8),
+            DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM => Ok(RenderFormat::R8G8),
+            DXGI_FORMAT::DXGI_FORMAT_A8_UNORM => Ok(RenderFormat::A8),
+            DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM => Ok(RenderFormat::BC1),
+            DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM => Ok(RenderFormat::BC2),
+            DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM => Ok(RenderFormat::BC3),
+            DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM => Ok(RenderFormat::BC4),
+            DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM => Ok(RenderFormat::BC5),
+            DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => Ok(RenderFormat::BC7),
+            _ => Err(UnsupportedFormatError),
         }
     }
 }

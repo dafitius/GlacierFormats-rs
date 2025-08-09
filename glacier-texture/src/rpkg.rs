@@ -78,9 +78,9 @@ impl GlacierResource for MipblockData{
 
     fn serialize(&self, woa_version: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
         if self.header.is_empty() && (woa_version == rpkg_rs::WoaVersion::HM2016 || woa_version == rpkg_rs::WoaVersion::HM2) {
-            return Err(GlacierResourceError::ReadError(format!("Cannot serialize to {:?} without header data :(", woa_version)));
+            return Err(GlacierResourceError::ReadError(format!("Cannot serialize to {woa_version:?} without header data :(")));
         }
-        self.pack_to_vec(woa_version.into()).map_err( |e| GlacierResourceError::WriteError(format!("Texd packing error: {}", e)))
+        self.pack_to_vec(woa_version.into()).map_err( |e| GlacierResourceError::WriteError(format!("Texd packing error: {e}")))
     }
 
     fn resource_type() -> [u8; 4] {
@@ -112,8 +112,8 @@ pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionMan
     let mut texture_map = TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
 
     if let Some((rrid, _)) = res_info.references().first(){
-        let texd_data = manager.read_resource_from("chunk0".parse().unwrap(), *rrid).map_err(|e| GlacierResourceError::ReadError(format!("Tried to load broken depend: {}", e)))?;
-        let mipblock = MipblockData::from_memory(texd_data.as_slice(), woa_version.into()).map_err(|e| GlacierResourceError::ReadError(format!("Failed to read texd: {}", e)))?;
+        let texd_data = manager.read_resource_from("chunk0".parse().unwrap(), *rrid).map_err(|e| GlacierResourceError::ReadError(format!("Tried to load broken depend: {e}")))?;
+        let mipblock = MipblockData::from_memory(texd_data.as_slice(), woa_version.into()).map_err(|e| GlacierResourceError::ReadError(format!("Failed to read texd: {e}")))?;
         texture_map.set_mipblock1(mipblock);
     }
     Ok(texture_map)

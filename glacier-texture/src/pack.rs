@@ -1,16 +1,22 @@
+use crate::atlas::AtlasData;
 use crate::enums::*;
-use std::{io, slice};
+use crate::mipblock::MipblockData;
+use crate::pack::TexturePackerError::{DirectXTexError, PackingError};
+use crate::texture_map::{
+    TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3,
+    TextureMapInner,
+};
+use crate::{convert, WoaVersion};
+use directxtex::{
+    Image, ScratchImage, DXGI_FORMAT, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT,
+    TGA_FLAGS,
+};
+use lz4::block::CompressionMode;
 use std::cmp::max;
 use std::io::{Cursor, Read};
 use std::ptr::NonNull;
-use directxtex::{DXGI_FORMAT, Image, ScratchImage, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
-use lz4::block::CompressionMode;
+use std::{io, slice};
 use thiserror::Error;
-use crate::texture_map::{TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3, TextureMapInner};
-use crate::pack::TexturePackerError::{DirectXTexError, PackingError};
-use crate::{convert, WoaVersion};
-use crate::atlas::AtlasData;
-use crate::mipblock::MipblockData;
 
 #[derive(Debug, Error)]
 pub enum TexturePackerError {
@@ -26,7 +32,6 @@ pub enum TexturePackerError {
     #[error("Error building texture: {0}")]
     PackingError(String),
 }
-
 
 pub enum MipLevels {
     All,
@@ -59,8 +64,7 @@ impl TextureMapParams {
             interpret_as: InterpretAs::Normal,
             dimensions: Dimensions::_2D,
 
-            flags: TextureFlagsInner::default()
-                .with_unknown3(true),
+            flags: TextureFlagsInner::default().with_unknown3(true),
             format,
             num_mip_levels: MipLevels::All,
             default_mip_level: 0,
@@ -81,44 +85,52 @@ pub struct TextureMapBuilder {
 
 impl TextureMapBuilder {
     /// Creates a new TextureMapBuilder with default settings.
-    pub fn from_tga<R: Read>(
-        mut reader: R,
-    ) -> Result<Self, TexturePackerError> {
+    pub fn from_tga<R: Read>(mut reader: R) -> Result<Self, TexturePackerError> {
         let mut image_data = vec![];
-        reader.read_to_end(&mut image_data).map_err(TexturePackerError::IoError)?;
-        let mut image = ScratchImage::load_tga(
-            image_data.as_slice(),
-            TGA_FLAGS::TGA_FLAGS_NONE,
-            None,
-        ).map_err(DirectXTexError)?;
+        reader
+            .read_to_end(&mut image_data)
+            .map_err(TexturePackerError::IoError)?;
+        let image = ScratchImage::load_tga(image_data.as_slice(), TGA_FLAGS::TGA_FLAGS_NONE, None)
+            .map_err(DirectXTexError)?;
 
-        if image.metadata().format.is_compressed() {
-            let render_format: RenderFormat = image.metadata().format.into();
-            image = image.decompress(match render_format.num_channels() {
-                1 => DXGI_FORMAT::DXGI_FORMAT_A8_UNORM,
-                2 => DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM,
-                4 => DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
-                _ => DXGI_FORMAT::DXGI_FORMAT_UNKNOWN,
-            }).map_err(DirectXTexError)?;
-        }
+        let metadata = image.metadata();
+        let render_format = metadata.format.try_into().or_else(|_err| {
+            let bits_per_pixel = metadata.format.bits_per_pixel();
+            let bits_per_color = metadata.format.bits_per_color();
+            let num_channels = bits_per_pixel.checked_div(bits_per_color).unwrap_or(0);
+
+            match (bits_per_pixel, bits_per_color) {
+                (8, 8) => Ok(RenderFormat::A8),
+                (16, 8) => Ok(RenderFormat::R8G8),
+                (24, 8) => Ok(RenderFormat::R8G8B8A8),
+                (32, 8) => Ok(RenderFormat::R8G8B8A8),
+                (64, 16) => Ok(RenderFormat::R16G16B16A16),
+                _ => Err(PackingError(format!(
+                    "Unsupported render format: bpp={}, bpc={}, channels={:?}, format={:?}",
+                    bits_per_pixel, bits_per_color, num_channels, metadata.format
+                ))),
+            }
+        })?;
 
         Ok(Self {
-            params: TextureMapParams::new(image.metadata().format.into()),
+            params: TextureMapParams::new(render_format),
             atlas_data: None,
             image,
             use_mipblock1: true,
         })
     }
 
-    pub fn from_texture_map(texture: &TextureMap) -> Result<Self, TexturePackerError>{
-        let mut builder = convert::create_tga(texture).map(|tga| {
-            let reader = Cursor::new(tga);
-            Self::from_tga(reader)
-        }).map_err(|e| PackingError(format!("Failed to convert texture: {}", e)))??;
-        
+    pub fn from_texture_map(texture: &TextureMap) -> Result<Self, TexturePackerError> {
+        let mut builder = convert::create_tga(texture)
+            .map(|tga| {
+                let reader = Cursor::new(tga);
+                Self::from_tga(reader)
+            })
+            .map_err(|e| PackingError(format!("Failed to convert texture: {e}")))??;
+
         builder.atlas_data = texture.atlas().clone();
         builder.params.texture_type = texture.texture_type();
-        if let Some(interpret_as) = texture.interpret_as(){
+        if let Some(interpret_as) = texture.interpret_as() {
             builder.params.interpret_as = interpret_as;
         }
         Ok(builder)
@@ -185,19 +197,34 @@ impl TextureMapBuilder {
 
     ///Convert the image to a different format.
     /// It is assumed that the input image is not compressed
-    fn convert_to_format(image: ScratchImage, new_format: DXGI_FORMAT) -> Result<ScratchImage, TexturePackerError> {
-        let reqs = [new_format.is_typeless(false), new_format.is_planar(), new_format.is_palettized()];
+    fn convert_to_format(
+        image: ScratchImage,
+        new_format: DXGI_FORMAT,
+    ) -> Result<ScratchImage, TexturePackerError> {
+        let reqs = [
+            new_format.is_typeless(false),
+            new_format.is_planar(),
+            new_format.is_palettized(),
+        ];
         if reqs.iter().any(|b| *b) {
             return Err(PackingError(format!("Invalid compression format provided, the provided format is [typeless: {}, planar: {}, palettized: {}]", reqs[0], reqs[1], reqs[2])));
         }
 
         Ok(match new_format.is_compressed() {
-            true => {
-                image.compress(new_format, TEX_COMPRESS_FLAGS::TEX_COMPRESS_BC7_QUICK, TEX_THRESHOLD_DEFAULT).map_err(DirectXTexError)?
-            }
-            false => {
-                image.convert(new_format, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT).map_err(DirectXTexError)?
-            }
+            true => image
+                .compress(
+                    new_format,
+                    TEX_COMPRESS_FLAGS::TEX_COMPRESS_BC7_QUICK,
+                    TEX_THRESHOLD_DEFAULT,
+                )
+                .map_err(DirectXTexError)?,
+            false => image
+                .convert(
+                    new_format,
+                    TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT,
+                    TEX_THRESHOLD_DEFAULT,
+                )
+                .map_err(DirectXTexError)?,
         })
     }
 
@@ -206,18 +233,34 @@ impl TextureMapBuilder {
         let width = self.image.metadata().width as u16;
         let height = self.image.metadata().height as u16;
 
-        let mut image = self.image.generate_mip_maps(match self.params.mip_filter {
-            MipFilter::Nearest => { TEX_FILTER_FLAGS::TEX_FILTER_POINT }
-            MipFilter::Linear => { TEX_FILTER_FLAGS::TEX_FILTER_LINEAR }
-            MipFilter::Cubic => { TEX_FILTER_FLAGS::TEX_FILTER_CUBIC }
-            MipFilter::Box => { TEX_FILTER_FLAGS::TEX_FILTER_BOX }
-        } | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC, match self.params.num_mip_levels {
-            MipLevels::All => { 0 }
-            MipLevels::Limit(n) => { n as usize }
-        })?;
+        if !width.is_power_of_two() {
+            return Err(PackingError(format!(
+                "Width ({width}) is not a power of two!"
+            )));
+        }
 
-        if RenderFormat::from(self.image.metadata().format) != self.params.format {
-            image = Self::convert_to_format(image, self.params.format.into())?;
+        if !height.is_power_of_two() {
+            return Err(PackingError(format!(
+                "Height ({height}) is not a power of two!"
+            )));
+        }
+
+        let mut image = self.image.generate_mip_maps(
+            match self.params.mip_filter {
+                MipFilter::Nearest => TEX_FILTER_FLAGS::TEX_FILTER_POINT,
+                MipFilter::Linear => TEX_FILTER_FLAGS::TEX_FILTER_LINEAR,
+                MipFilter::Cubic => TEX_FILTER_FLAGS::TEX_FILTER_CUBIC,
+                MipFilter::Box => TEX_FILTER_FLAGS::TEX_FILTER_BOX,
+            } | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC,
+            match self.params.num_mip_levels {
+                MipLevels::All => 0,
+                MipLevels::Limit(n) => n as usize,
+            },
+        )?;
+
+        let target_format = self.params.format.into();
+        if self.image.metadata().format != target_format {
+            image = Self::convert_to_format(image, target_format)?;
         }
 
         let generated_mip_levels = image.metadata().mip_levels.clamp(0, 14) as u8;
@@ -231,7 +274,8 @@ impl TextureMapBuilder {
                 .and_then(|index| mip_sizes.get(index))
                 .copied()
                 .unwrap_or(0);
-            mip_sizes[i] = last + image.image(i, 0, 0).map(|img| img.slice_pitch).unwrap_or(0) as u32;
+            mip_sizes[i] =
+                last + image.image(i, 0, 0).map(|img| img.slice_pitch).unwrap_or(0) as u32;
         }
 
         let mut data = Self::serialize_mipmaps(&image, generated_mip_levels)?;
@@ -242,15 +286,26 @@ impl TextureMapBuilder {
             for mip in 0..generated_mip_levels as usize {
                 if let Some(mip_image) = image.image(mip, 0, 0) {
                     let mut mip_data = vec![0u8; mip_image.slice_pitch];
-                    cursor.read(mip_data.as_mut_slice()).map_err(TexturePackerError::IoError)?;
-                    let mip_compressed = lz4::block::compress(&mip_data, Some(CompressionMode::HIGHCOMPRESSION(12)), false).map_err(|_| PackingError(format!("Failed to compress mip level {}", mip)))?;
+                    cursor
+                        .read(mip_data.as_mut_slice())
+                        .map_err(TexturePackerError::IoError)?;
+                    let mip_compressed = lz4::block::compress(
+                        &mip_data,
+                        Some(CompressionMode::HIGHCOMPRESSION(12)),
+                        false,
+                    )
+                    .map_err(|_| PackingError(format!("Failed to compress mip level {mip}")))?;
 
                     let last: u32 = mip
                         .checked_sub(1)
                         .and_then(|index| compressed_mip_sizes.get(index))
                         .copied()
                         .unwrap_or(0);
-                    compressed_mip_sizes[mip] = last + image.image(mip, 0, 0).map(|_| mip_compressed.len()).unwrap_or(0) as u32;
+                    compressed_mip_sizes[mip] = last
+                        + image
+                            .image(mip, 0, 0)
+                            .map(|_| mip_compressed.len())
+                            .unwrap_or(0) as u32;
 
                     compressed_image_buffer.extend(mip_compressed);
                 }
@@ -260,7 +315,9 @@ impl TextureMapBuilder {
 
         let texture_data = if self.use_mipblock1 {
             TextureData::Mipblock1(MipblockData {
-                video_memory_requirement: (mip_sizes.first().copied().unwrap_or(0x0) + mip_sizes.get(1).copied().unwrap_or(0x0)) as usize,
+                video_memory_requirement: (mip_sizes.first().copied().unwrap_or(0x0)
+                    + mip_sizes.get(1).copied().unwrap_or(0x0))
+                    as usize,
                 header: vec![],
                 data,
             })
@@ -291,7 +348,8 @@ impl TextureMapBuilder {
                     header,
                     atlas_data: self.atlas_data,
                     data: texture_data,
-                }.into()
+                }
+                .into()
             }
             WoaVersion::HM2 => {
                 let header = TextureMapHeaderV2 {
@@ -314,7 +372,8 @@ impl TextureMapBuilder {
                     header,
                     atlas_data: self.atlas_data,
                     data: texture_data,
-                }.into()
+                }
+                .into()
             }
             WoaVersion::HM3 => {
                 let header = TextureMapHeaderV3 {
@@ -335,7 +394,8 @@ impl TextureMapBuilder {
                     header,
                     atlas_data: self.atlas_data,
                     data: texture_data,
-                }.into()
+                }
+                .into()
             }
         };
 
@@ -361,10 +421,7 @@ impl TextureMapBuilder {
                 let buffer = Self::process_mip_image(mip_image).unwrap_or(vec![]);
                 serialized.extend_from_slice(buffer.as_slice());
             } else {
-                return Err(PackingError(format!(
-                    "Missing mip level {}",
-                    mip
-                )));
+                return Err(PackingError(format!("Missing mip level {mip}")));
             }
         }
         Ok(serialized)

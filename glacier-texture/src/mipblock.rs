@@ -115,7 +115,7 @@ impl MipblockData{
             WoaVersion::HM3 => {
                 self.data.clone()
             }
-        }.as_slice()).map_err(|e| TexturePackerError::PackingError(format!("Unable to pack mipblock1: {}",e)))?;
+        }.as_slice()).map_err(|e| TexturePackerError::PackingError(format!("Unable to pack mipblock1: {e}")))?;
         Ok(())
     }
 }

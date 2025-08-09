@@ -24,7 +24,7 @@ impl FromStr for WoaVersion {
             "1" | "H1" | "HM1" | "HM2016" | "H2016" => Ok(WoaVersion::HM2016),
             "2" | "H2" | "HM2" | "HM2018" | "H2018" => Ok(WoaVersion::HM2),
             "3" | "H3" | "HM3" | "HM2020" | "H2020" => Ok(WoaVersion::HM3),
-            _ => Err(format!("Invalid value for WoaVersion: {}", s)),
+            _ => Err(format!("Invalid value for WoaVersion: {s}")),
         }
     }
 }

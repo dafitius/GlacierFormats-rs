@@ -1,17 +1,17 @@
 #![allow(unused_variables)]
 
-use std::{fs, io};
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Cursor, Seek, Write};
-use std::path::Path;
-use binrw::{BinRead, binread, BinResult, binrw, BinWrite, BinWriterExt, Endian};
-use binrw::helpers::until_eof;
-use serde::{Deserialize, Serialize};
 use crate::atlas::AtlasData;
 use crate::enums::*;
 use crate::mipblock::MipblockData;
 use crate::pack::TexturePackerError;
 use crate::WoaVersion;
+use binrw::helpers::until_eof;
+use binrw::{binread, binrw, BinRead, BinResult, BinWrite, BinWriterExt, Endian};
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Cursor, Seek, Write};
+use std::path::Path;
+use std::{fs, io};
 
 /// Represents the maximum number of mip levels supported.
 const MAX_MIP_LEVELS: usize = 0xE;
@@ -98,8 +98,7 @@ pub(crate) struct TextureMapHeaderV1 {
 }
 
 impl TextureMapHeaderImpl for TextureMapHeaderV1 {
-    fn text_scale(&self) -> usize
-    {
+    fn text_scale(&self) -> usize {
         let texd_mips = self.num_mip_levels as usize;
 
         if texd_mips == 1 {
@@ -176,8 +175,7 @@ pub(crate) struct TextureMapHeaderV2 {
 }
 
 impl TextureMapHeaderImpl for TextureMapHeaderV2 {
-    fn text_scale(&self) -> usize
-    {
+    fn text_scale(&self) -> usize {
         let texd_mips = self.num_mip_levels as usize;
         if texd_mips == 1 {
             return 0;
@@ -210,7 +208,10 @@ impl TextureMapHeaderImpl for TextureMapHeaderV2 {
         if blocks_to_skip == 0 {
             return last_mip_size;
         }
-        let texd_mip_size = self.compressed_mip_sizes.get(blocks_to_skip - 1).unwrap_or(&0);
+        let texd_mip_size = self
+            .compressed_mip_sizes
+            .get(blocks_to_skip - 1)
+            .unwrap_or(&0);
         last_mip_size - *texd_mip_size as usize
     }
 
@@ -287,7 +288,7 @@ impl TextureMapHeaderImpl for TextureMapHeaderV3 {
             return 0;
         }
 
-        if self.type_ == TextureType::Billboard || self.interpret_as == InterpretAs::Volume{
+        if self.type_ == TextureType::Billboard || self.interpret_as == InterpretAs::Volume {
             return 0;
         }
 
@@ -314,7 +315,10 @@ impl TextureMapHeaderImpl for TextureMapHeaderV3 {
         if blocks_to_skip == 0 {
             return last_mip_size;
         }
-        let texd_mip_size = self.compressed_mip_sizes.get(blocks_to_skip - 1).unwrap_or(&0);
+        let texd_mip_size = self
+            .compressed_mip_sizes
+            .get(blocks_to_skip - 1)
+            .unwrap_or(&0);
         last_mip_size - *texd_mip_size as usize
     }
 
@@ -351,28 +355,27 @@ pub(crate) enum TextureMapVersion {
 
 impl From<TextureMapInner<TextureMapHeaderV1>> for TextureMap {
     fn from(inner: TextureMapInner<TextureMapHeaderV1>) -> Self {
-        Self{
-            inner: TextureMapVersion::V1(inner)
+        Self {
+            inner: TextureMapVersion::V1(inner),
         }
     }
 }
 
 impl From<TextureMapInner<TextureMapHeaderV2>> for TextureMap {
     fn from(inner: TextureMapInner<TextureMapHeaderV2>) -> Self {
-        Self{
-            inner: TextureMapVersion::V2(inner)
+        Self {
+            inner: TextureMapVersion::V2(inner),
         }
     }
 }
 
 impl From<TextureMapInner<TextureMapHeaderV3>> for TextureMap {
     fn from(inner: TextureMapInner<TextureMapHeaderV3>) -> Self {
-        Self{
-            inner: TextureMapVersion::V3(inner)
+        Self {
+            inner: TextureMapVersion::V3(inner),
         }
     }
 }
-
 
 /// Represents the texture data, which can be either raw texture data or a mipblock read from a texd file.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -383,18 +386,24 @@ pub enum TextureData {
     Mipblock1(MipblockData),
 }
 
-
 impl BinWrite for TextureData {
     type Args<'a> = (usize,);
 
-    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
+    fn write_options<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        endian: Endian,
+        args: Self::Args<'_>,
+    ) -> BinResult<()> {
         match self {
-            TextureData::Tex(data) => {
-                writer.write_type(data, endian)
-            }
+            TextureData::Tex(data) => writer.write_type(data, endian),
             TextureData::Mipblock1(mipblock) => {
                 let data = &mipblock.data;
-                let cut_data = &data.clone().into_iter().skip(data.len() - args.0).collect::<Vec<_>>();
+                let cut_data = &data
+                    .clone()
+                    .into_iter()
+                    .skip(data.len() - args.0)
+                    .collect::<Vec<_>>();
                 writer.write_type(cut_data, endian)
             }
         }
@@ -404,8 +413,8 @@ impl BinWrite for TextureData {
 impl TextureData {
     fn size(&self) -> usize {
         match self {
-            TextureData::Tex(d) => { d.len() }
-            TextureData::Mipblock1(d) => { d.data.len() }
+            TextureData::Tex(d) => d.len(),
+            TextureData::Mipblock1(d) => d.data.len(),
         }
     }
 }
@@ -414,7 +423,7 @@ impl TextureData {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub(crate) struct TextureMapInner<A>
 where
-    A: for<'a> BinRead<Args<'a>=()>,
+    A: for<'a> BinRead<Args<'a> = ()>,
     A: TextureMapHeaderImpl,
 {
     pub header: A,
@@ -430,16 +439,21 @@ where
 
 impl<A> BinWrite for TextureMapInner<A>
 where
-    A: for<'a> BinWrite<Args<'a>=(DynamicTextureMapArgs,)> + Clone + for<'a> binrw::BinRead<Args<'a>=()>,
+    A: for<'a> BinWrite<Args<'a> = (DynamicTextureMapArgs,)>
+        + Clone
+        + for<'a> binrw::BinRead<Args<'a> = ()>,
     A: TextureMapHeaderImpl,
 {
     type Args<'a> = ();
 
-    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, _: Self::Args<'_>) -> BinResult<()> {
+    fn write_options<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        endian: Endian,
+        _: Self::Args<'_>,
+    ) -> BinResult<()> {
         let atlas_size = self.atlas_data_size();
-        let total_size = self.data.size()
-            + A::size()
-            + atlas_size;
+        let total_size = self.data.size() + A::size() + atlas_size;
 
         let args = DynamicTextureMapArgs {
             data_size: total_size as u32,
@@ -464,15 +478,15 @@ where
 
 impl<A> TextureMapInner<A>
 where
-    A: for<'a> BinRead<Args<'a>=()>,
+    A: for<'a> BinRead<Args<'a> = ()>,
     A: Clone,
-    A: for<'a> binrw::BinWrite<Args<'a>=(DynamicTextureMapArgs,)>,
+    A: for<'a> binrw::BinWrite<Args<'a> = (DynamicTextureMapArgs,)>,
     A: TextureMapHeaderImpl,
 {
     pub fn data(&self) -> &Vec<u8> {
         match &self.data {
-            TextureData::Tex(d) => { d }
-            TextureData::Mipblock1(d) => { &d.data }
+            TextureData::Tex(d) => d,
+            TextureData::Mipblock1(d) => &d.data,
         }
     }
 
@@ -481,13 +495,16 @@ where
     }
 
     fn atlas_data_size(&self) -> usize {
-        self.atlas_data.as_ref().map(|atlas| atlas.size()).unwrap_or(0)
+        self.atlas_data
+            .as_ref()
+            .map(|atlas| atlas.size())
+            .unwrap_or(0)
     }
 
     pub fn has_mipblock_data(&self) -> bool {
         match &self.data {
-            TextureData::Tex(_) => { false }
-            TextureData::Mipblock1(_) => { true }
+            TextureData::Tex(_) => false,
+            TextureData::Mipblock1(_) => true,
         }
     }
 }
@@ -501,44 +518,43 @@ pub struct MipLevel {
 }
 
 impl TextureMap {
-
-    pub fn default_mip_level(&self) -> u8{
-        match &self.inner{
-            TextureMapVersion::V1(tex) => {tex.header.default_mip_level}
-            TextureMapVersion::V2(tex) => {tex.header.default_mip_level}
-            TextureMapVersion::V3(tex) => {tex.header.default_mip_level}
+    pub fn default_mip_level(&self) -> u8 {
+        match &self.inner {
+            TextureMapVersion::V1(tex) => tex.header.default_mip_level,
+            TextureMapVersion::V2(tex) => tex.header.default_mip_level,
+            TextureMapVersion::V3(tex) => tex.header.default_mip_level,
         }
     }
 
     pub fn version(&self) -> WoaVersion {
-        match &self.inner{
-            TextureMapVersion::V1(_) => { WoaVersion::HM2016 }
-            TextureMapVersion::V2(_) => { WoaVersion::HM2 }
-            TextureMapVersion::V3(_) => { WoaVersion::HM3 }
+        match &self.inner {
+            TextureMapVersion::V1(_) => WoaVersion::HM2016,
+            TextureMapVersion::V2(_) => WoaVersion::HM2,
+            TextureMapVersion::V3(_) => WoaVersion::HM3,
         }
     }
 
     pub(crate) fn data(&self) -> &Vec<u8> {
         match &self.inner {
-            TextureMapVersion::V1(t) => { t.data() }
-            TextureMapVersion::V2(t) => { t.data() }
-            TextureMapVersion::V3(t) => { t.data() }
+            TextureMapVersion::V1(t) => t.data(),
+            TextureMapVersion::V2(t) => t.data(),
+            TextureMapVersion::V3(t) => t.data(),
         }
     }
 
     pub fn atlas(&self) -> &Option<AtlasData> {
         match &self.inner {
-            TextureMapVersion::V1(t) => { t.atlas_data() }
-            TextureMapVersion::V2(t) => { t.atlas_data() }
-            TextureMapVersion::V3(t) => { t.atlas_data() }
+            TextureMapVersion::V1(t) => t.atlas_data(),
+            TextureMapVersion::V2(t) => t.atlas_data(),
+            TextureMapVersion::V3(t) => t.atlas_data(),
         }
     }
 
     fn set_data(&mut self, data: TextureData) {
         match &mut self.inner {
-            TextureMapVersion::V1(t) => { t.data = data }
-            TextureMapVersion::V2(t) => { t.data = data }
-            TextureMapVersion::V3(t) => { t.data = data }
+            TextureMapVersion::V1(t) => t.data = data,
+            TextureMapVersion::V2(t) => t.data = data,
+            TextureMapVersion::V3(t) => t.data = data,
         }
     }
 
@@ -548,9 +564,9 @@ impl TextureMap {
 
     fn texd_mip_levels(&self) -> usize {
         match &self.inner {
-            TextureMapVersion::V1(inner) => { inner.header.num_mip_levels as usize }
-            TextureMapVersion::V2(inner) => { inner.header.num_mip_levels as usize }
-            TextureMapVersion::V3(inner) => { inner.header.num_mip_levels as usize }
+            TextureMapVersion::V1(inner) => inner.header.num_mip_levels as usize,
+            TextureMapVersion::V2(inner) => inner.header.num_mip_levels as usize,
+            TextureMapVersion::V3(inner) => inner.header.num_mip_levels as usize,
         }
     }
 
@@ -564,57 +580,103 @@ impl TextureMap {
 
     fn text_scale(&self) -> usize {
         match &self.inner {
-            TextureMapVersion::V1(tex) => { tex.header.text_scale() }
-            TextureMapVersion::V2(tex) => { tex.header.text_scale() }
-            TextureMapVersion::V3(tex) => { tex.header.text_scale() }
+            TextureMapVersion::V1(tex) => tex.header.text_scale(),
+            TextureMapVersion::V2(tex) => tex.header.text_scale(),
+            TextureMapVersion::V3(tex) => tex.header.text_scale(),
         }
     }
 
     fn mip_sizes(&self) -> Vec<u32> {
         match &self.inner {
-            TextureMapVersion::V1(tex) => { tex.header.mip_sizes.iter().copied().filter(|mip| *mip != 0).collect() }
-            TextureMapVersion::V2(tex) => { tex.header.mip_sizes.iter().copied().filter(|mip| *mip != 0).collect() }
-            TextureMapVersion::V3(tex) => { tex.header.mip_sizes.iter().copied().filter(|mip| *mip != 0).collect() }
+            TextureMapVersion::V1(tex) => tex
+                .header
+                .mip_sizes
+                .iter()
+                .copied()
+                .filter(|mip| *mip != 0)
+                .collect(),
+            TextureMapVersion::V2(tex) => tex
+                .header
+                .mip_sizes
+                .iter()
+                .copied()
+                .filter(|mip| *mip != 0)
+                .collect(),
+            TextureMapVersion::V3(tex) => tex
+                .header
+                .mip_sizes
+                .iter()
+                .copied()
+                .filter(|mip| *mip != 0)
+                .collect(),
         }
     }
 
     fn compressed_mip_sizes(&self) -> Vec<u32> {
         match &self.inner {
-            TextureMapVersion::V1(tex) => { tex.header.mip_sizes.iter().copied().filter(|mip| *mip != 0).collect() }
-            TextureMapVersion::V2(tex) => { tex.header.compressed_mip_sizes.iter().copied().filter(|mip| *mip != 0).collect() }
-            TextureMapVersion::V3(tex) => { tex.header.compressed_mip_sizes.iter().copied().filter(|mip| *mip != 0).collect() }
+            TextureMapVersion::V1(tex) => tex
+                .header
+                .mip_sizes
+                .iter()
+                .copied()
+                .filter(|mip| *mip != 0)
+                .collect(),
+            TextureMapVersion::V2(tex) => tex
+                .header
+                .compressed_mip_sizes
+                .iter()
+                .copied()
+                .filter(|mip| *mip != 0)
+                .collect(),
+            TextureMapVersion::V3(tex) => tex
+                .header
+                .compressed_mip_sizes
+                .iter()
+                .copied()
+                .filter(|mip| *mip != 0)
+                .collect(),
         }
     }
 
     pub fn video_memory_requirement(&self) -> usize {
-        match self.version(){
-            WoaVersion::HM2016 |
-            WoaVersion::HM2 => {
-                self.mip_sizes().get(self.text_scale()).cloned().unwrap_or(0) as usize //The size of the largest TEXT mip
+        match self.version() {
+            WoaVersion::HM2016 | WoaVersion::HM2 => {
+                self.mip_sizes()
+                    .get(self.text_scale())
+                    .cloned()
+                    .unwrap_or(0) as usize //The size of the largest TEXT mip
             }
             WoaVersion::HM3 => {
-                if self.has_mipblock1(){ //if texture has a TEXD
-                    (self.mip_sizes().first().cloned().unwrap_or(0) + self.mip_sizes().get(1).cloned().unwrap_or(0)) as usize //the size of the largest two TEXD mip
-                } else {0}
+                if self.has_mipblock1() {
+                    //if texture has a TEXD
+                    (self.mip_sizes().first().cloned().unwrap_or(0)
+                        + self.mip_sizes().get(1).cloned().unwrap_or(0))
+                        as usize //the size of the largest two TEXD mip
+                } else {
+                    0
+                }
             }
         }
     }
 
     pub fn mipblock1(&self) -> Option<MipblockData> {
-        self.has_mipblock1().then(|| {
-            self.texd_header().ok().map(|header| MipblockData {
-                video_memory_requirement: self.mip_sizes().first().copied().unwrap_or(0x0) as usize,
-                header,
-                data: self.data().clone(),
+        self.has_mipblock1()
+            .then(|| {
+                self.texd_header().ok().map(|header| MipblockData {
+                    video_memory_requirement: self.mip_sizes().first().copied().unwrap_or(0x0)
+                        as usize,
+                    header,
+                    data: self.data().clone(),
+                })
             })
-        }).flatten()
+            .flatten()
     }
 
     fn texd_size(&self) -> (usize, usize) {
         match &self.inner {
-            TextureMapVersion::V1(tex) => { (tex.header.width as usize, tex.header.height as usize) }
-            TextureMapVersion::V2(tex) => { (tex.header.width as usize, tex.header.height as usize) }
-            TextureMapVersion::V3(tex) => { (tex.header.width as usize, tex.header.height as usize) }
+            TextureMapVersion::V1(tex) => (tex.header.width as usize, tex.header.height as usize),
+            TextureMapVersion::V2(tex) => (tex.header.width as usize, tex.header.height as usize),
+            TextureMapVersion::V3(tex) => (tex.header.width as usize, tex.header.height as usize),
         }
     }
 
@@ -625,62 +687,79 @@ impl TextureMap {
     }
 
     pub fn width(&self) -> usize {
-        if self.has_mipblock1() { self.texd_size().0 } else { self.text_size().0 }
+        if self.has_mipblock1() {
+            self.texd_size().0
+        } else {
+            self.text_size().0
+        }
     }
 
     pub fn height(&self) -> usize {
-        if self.has_mipblock1() { self.texd_size().1 } else { self.text_size().1 }
+        if self.has_mipblock1() {
+            self.texd_size().1
+        } else {
+            self.text_size().1
+        }
     }
 
     pub fn format(&self) -> RenderFormat {
         match &self.inner {
-            TextureMapVersion::V1(tex) => { tex.header.format }
-            TextureMapVersion::V2(tex) => { tex.header.format }
-            TextureMapVersion::V3(tex) => { tex.header.format }
+            TextureMapVersion::V1(tex) => tex.header.format,
+            TextureMapVersion::V2(tex) => tex.header.format,
+            TextureMapVersion::V3(tex) => tex.header.format,
         }
     }
 
     pub fn flags(&self) -> TextureFlags {
         match &self.inner {
-            TextureMapVersion::V1(tex) => {TextureFlags{inner: tex.header.flags}}
-            TextureMapVersion::V2(tex) => {TextureFlags{inner: tex.header.flags}}
-            TextureMapVersion::V3(tex) => {TextureFlags{inner: tex.header.flags}}
+            TextureMapVersion::V1(tex) => TextureFlags {
+                inner: tex.header.flags,
+            },
+            TextureMapVersion::V2(tex) => TextureFlags {
+                inner: tex.header.flags,
+            },
+            TextureMapVersion::V3(tex) => TextureFlags {
+                inner: tex.header.flags,
+            },
         }
     }
 
     pub fn texture_type(&self) -> TextureType {
         match &self.inner {
-            TextureMapVersion::V1(tex) => {tex.header.type_}
-            TextureMapVersion::V2(tex) => {tex.header.type_}
-            TextureMapVersion::V3(tex) => {tex.header.type_}
+            TextureMapVersion::V1(tex) => tex.header.type_,
+            TextureMapVersion::V2(tex) => tex.header.type_,
+            TextureMapVersion::V3(tex) => tex.header.type_,
         }
     }
 
     pub fn interpret_as(&self) -> Option<InterpretAs> {
         match &self.inner {
-            TextureMapVersion::V1(tex) => {Some(tex.header.interpret_as)}
-            TextureMapVersion::V2(_) => {None}
-            TextureMapVersion::V3(tex) => {Some(tex.header.interpret_as)}
+            TextureMapVersion::V1(tex) => Some(tex.header.interpret_as),
+            TextureMapVersion::V2(_) => None,
+            TextureMapVersion::V3(tex) => Some(tex.header.interpret_as),
         }
     }
 
     pub fn dimensions(&self) -> Dimensions {
         match &self.inner {
-            TextureMapVersion::V1(tex) => { tex.header.dimensions }
-            TextureMapVersion::V2(_) => { Dimensions::_2D }
-            TextureMapVersion::V3(tex) => { tex.header.dimensions }
+            TextureMapVersion::V1(tex) => tex.header.dimensions,
+            TextureMapVersion::V2(_) => Dimensions::_2D,
+            TextureMapVersion::V3(tex) => tex.header.dimensions,
         }
     }
 
     pub fn has_mipblock1(&self) -> bool {
         match &self.inner {
-            TextureMapVersion::V1(t) => { t.has_mipblock_data() }
-            TextureMapVersion::V2(t) => { t.has_mipblock_data() }
-            TextureMapVersion::V3(t) => { t.has_mipblock_data() }
+            TextureMapVersion::V1(t) => t.has_mipblock_data(),
+            TextureMapVersion::V2(t) => t.has_mipblock_data(),
+            TextureMapVersion::V3(t) => t.has_mipblock_data(),
         }
     }
 
-    pub fn from_file<P: AsRef<Path>>(path: P, woa_version: WoaVersion) -> Result<Self, TextureMapError> {
+    pub fn from_file<P: AsRef<Path>>(
+        path: P,
+        woa_version: WoaVersion,
+    ) -> Result<Self, TextureMapError> {
         let file = File::open(path).map_err(TextureMapError::IoError)?;
         let mut reader = BufReader::new(file);
         TextureMap::read_le_args(&mut reader, (woa_version,)).map_err(TextureMapError::ParsingError)
@@ -706,31 +785,65 @@ impl TextureMap {
         let mut block_sizes: Vec<u32> = self.compressed_mip_sizes();
 
         if !self.has_mipblock1() {
-            let removed_mip = mips_sizes.drain(0..removed_mip_count).collect::<Vec<u32>>().pop().unwrap_or(0);
-            mips_sizes.iter_mut().for_each(|x| if *x > 0 { *x -= removed_mip });
+            let removed_mip = mips_sizes
+                .drain(0..removed_mip_count)
+                .collect::<Vec<u32>>()
+                .pop()
+                .unwrap_or(0);
+            mips_sizes.iter_mut().for_each(|x| {
+                if *x > 0 {
+                    *x -= removed_mip
+                }
+            });
 
-            let removed_block = block_sizes.drain(0..removed_mip_count).collect::<Vec<u32>>().pop().unwrap_or(0);
-            block_sizes.iter_mut().for_each(|x| if *x > 0 { *x -= removed_block });
+            let removed_block = block_sizes
+                .drain(0..removed_mip_count)
+                .collect::<Vec<u32>>()
+                .pop()
+                .unwrap_or(0);
+            block_sizes.iter_mut().for_each(|x| {
+                if *x > 0 {
+                    *x -= removed_block
+                }
+            });
         }
 
         if level > self.texd_mip_levels() {
-            return Err(TextureMapError::UnknownError("mip level is out of bounds".parse().unwrap()));
+            return Err(TextureMapError::UnknownError(
+                "mip level is out of bounds".parse().unwrap(),
+            ));
         }
 
         let mip_start = if level > 0 { mips_sizes[level - 1] } else { 0 };
-        let mip_size = mips_sizes.get(level).ok_or(TextureMapError::UnknownError("mip level is out of bounds".parse().unwrap()))? - mip_start;
+        let mip_size = mips_sizes.get(level).ok_or(TextureMapError::UnknownError(
+            "mip level is out of bounds".parse().unwrap(),
+        ))? - mip_start;
 
         let block_start = if level > 0 { block_sizes[level - 1] } else { 0 };
-        let block_size = block_sizes.get(level).ok_or(TextureMapError::UnknownError("mip level is out of bounds".parse().unwrap()))? - block_start;
+        let block_size = block_sizes.get(level).ok_or(TextureMapError::UnknownError(
+            "mip level is out of bounds".parse().unwrap(),
+        ))? - block_start;
 
         let is_compressed = mip_size != block_size;
-        let block = self.data().clone().into_iter().skip(block_start as usize).take(block_size as usize).collect::<Vec<u8>>();
+        let block = self
+            .data()
+            .clone()
+            .into_iter()
+            .skip(block_start as usize)
+            .take(block_size as usize)
+            .collect::<Vec<u8>>();
         let data = if is_compressed {
             let mut dst = vec![0u8; mip_size as usize];
-            match lz4::block::decompress_to_buffer(block.as_slice(), Some(mip_size as i32), &mut dst) {
+            match lz4::block::decompress_to_buffer(
+                block.as_slice(),
+                Some(mip_size as i32),
+                &mut dst,
+            ) {
                 Ok(_) => {}
                 Err(e) => {
-                    return Err(TextureMapError::UnknownError(format!("Failed to decompress texture data {}", e)));
+                    return Err(TextureMapError::UnknownError(format!(
+                        "Failed to decompress texture data {e}"
+                    )));
                 }
             };
             dst
@@ -750,26 +863,26 @@ impl TextureMap {
         self.atlas().is_some()
     }
 
-    pub fn set_mipblock1(&mut self, mipblock: MipblockData){
+    pub fn set_mipblock1(&mut self, mipblock: MipblockData) {
         self.set_data(TextureData::Mipblock1(mipblock))
     }
 
-    fn texd_header(&self) -> Result<Vec<u8>, TextureMapError>{
+    fn texd_header(&self) -> Result<Vec<u8>, TextureMapError> {
         let mut writer = Cursor::new(Vec::new());
 
-        let data = match &self.inner{
-            TextureMapVersion::V1(d) => {&d.data}
-            TextureMapVersion::V2(d) => {&d.data}
-            TextureMapVersion::V3(d) => {&d.data}
+        let data = match &self.inner {
+            TextureMapVersion::V1(d) => &d.data,
+            TextureMapVersion::V2(d) => &d.data,
+            TextureMapVersion::V3(d) => &d.data,
         };
 
         let atlas_size = self.atlas().as_ref().map(|atlas| atlas.size()).unwrap_or(0);
         let total_size = data.size()
             + match &self.inner {
-            TextureMapVersion::V1(_) => {TextureMapHeaderV1::size()}
-            TextureMapVersion::V2(_) => {TextureMapHeaderV2::size()}
-            TextureMapVersion::V3(_) => {TextureMapHeaderV3::size()}
-        }
+                TextureMapVersion::V1(_) => TextureMapHeaderV1::size(),
+                TextureMapVersion::V2(_) => TextureMapHeaderV2::size(),
+                TextureMapVersion::V3(_) => TextureMapHeaderV3::size(),
+            }
             + atlas_size;
 
         let args = DynamicTextureMapArgs {
@@ -782,9 +895,18 @@ impl TextureMap {
         };
 
         match &self.inner {
-            TextureMapVersion::V1(tex) => {tex.header.write_options(&mut writer, Endian::Little, (args,))?}
-            TextureMapVersion::V2(tex) => {tex.header.write_options(&mut writer, Endian::Little, (args,))?}
-            TextureMapVersion::V3(tex) => {tex.header.write_options(&mut writer, Endian::Little, (args,))?}
+            TextureMapVersion::V1(tex) => {
+                tex.header
+                    .write_options(&mut writer, Endian::Little, (args,))?
+            }
+            TextureMapVersion::V2(tex) => {
+                tex.header
+                    .write_options(&mut writer, Endian::Little, (args,))?
+            }
+            TextureMapVersion::V3(tex) => {
+                tex.header
+                    .write_options(&mut writer, Endian::Little, (args,))?
+            }
         }
 
         // If atlas_data is present, write it
@@ -794,7 +916,6 @@ impl TextureMap {
 
         Ok(writer.into_inner())
     }
-
 
     pub fn pack_to_vec(&self) -> Result<Vec<u8>, TexturePackerError> {
         let mut writer = Cursor::new(Vec::new());
@@ -815,4 +936,3 @@ impl TextureMap {
         Ok(())
     }
 }
-
