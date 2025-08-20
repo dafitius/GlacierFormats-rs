@@ -133,7 +133,7 @@ pub fn dynamic_image_to_scratch_image(buf: &[u8], width: u32, height: u32, color
     };
 
     image
-        .resize(width, height, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT)
+        .resize(width, height, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC)
         .map_err(TextureMapEncodeError::DirectXTexError)
 }
 

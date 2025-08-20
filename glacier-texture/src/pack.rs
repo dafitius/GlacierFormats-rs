@@ -380,9 +380,9 @@ impl TextureMapBuilder {
             MipFilter::Box => TEX_FILTER_FLAGS::TEX_FILTER_BOX,
         };
 
-        if cfg!(windows) {
+        // if cfg!(windows) {
             filter |= TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC;
-        }
+        // }
 
         let mut image = self.image.generate_mip_maps(
             filter,
