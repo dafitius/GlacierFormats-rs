@@ -8,9 +8,11 @@ use crate::texture_map::{
 };
 use crate::{convert, WoaVersion};
 use directxtex::{
-    Image, ScratchImage, DXGI_FORMAT, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT,
-    TGA_FLAGS,
+    Image, ScratchImage, DDS_FLAGS, DXGI_FORMAT, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS,
+    TEX_THRESHOLD_DEFAULT, TGA_FLAGS,
 };
+#[cfg(feature = "image")]
+use image::DynamicImage;
 use lz4::block::CompressionMode;
 use std::cmp::max;
 use std::io::{Cursor, Read};
@@ -33,11 +35,13 @@ pub enum TexturePackerError {
     PackingError(String),
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum MipLevels {
     All,
     Limit(u8),
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum MipFilter {
     Nearest,
     Linear,
@@ -45,7 +49,8 @@ pub enum MipFilter {
     Box,
 }
 
-struct TextureMapParams {
+#[derive(Copy, Clone, Debug)]
+pub struct TextureMapParameters {
     texture_type: TextureType,
     interpret_as: InterpretAs,
     dimensions: Dimensions,
@@ -57,7 +62,7 @@ struct TextureMapParams {
     mip_filter: MipFilter,
 }
 
-impl TextureMapParams {
+impl TextureMapParameters {
     pub fn new(format: RenderFormat) -> Self {
         Self {
             texture_type: TextureType::Colour,
@@ -72,19 +77,117 @@ impl TextureMapParams {
             mip_filter: MipFilter::Box,
         }
     }
+
+    pub fn from_texture_map(texture: &TextureMap) -> Self {
+        Self {
+            texture_type: texture.texture_type(),
+            interpret_as: texture.interpret_as().unwrap_or(InterpretAs::Normal),
+            dimensions: Dimensions::_2D,
+
+            flags: texture.flags().inner,
+            format: texture.format(),
+            num_mip_levels: MipLevels::All,
+            default_mip_level: 0,
+            texd_identifier: 0x4000,
+            mip_filter: MipFilter::Box,
+        }
+    }
+
+    pub fn texture_type(&self) -> TextureType {
+        self.texture_type
+    }
+    pub fn interpret_as(&self) -> InterpretAs {
+        self.interpret_as
+    }
+    pub fn dimensions(&self) -> Dimensions {
+        self.dimensions
+    }
+    pub fn flags(&self) -> TextureFlags {
+        TextureFlags { inner: self.flags }
+    }
+    pub fn format(&self) -> RenderFormat {
+        self.format
+    }
+    pub fn num_mip_levels(&self) -> MipLevels {
+        self.num_mip_levels
+    }
+    pub fn default_mip_level(&self) -> u8 {
+        self.default_mip_level
+    }
+
+    pub fn texd_identifier(&self) -> u32 {
+        self.texd_identifier
+    }
+
+    pub fn mip_filter(&self) -> MipFilter {
+        self.mip_filter
+    }
+
+    pub fn set_texture_type(&mut self, texture_type: TextureType) {
+        self.texture_type = texture_type;
+    }
+
+    pub fn set_interpret_as(&mut self, interpret_as: InterpretAs) {
+        self.interpret_as = interpret_as;
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn set_dimensions(&mut self, dimensions: Dimensions) {
+        self.dimensions = dimensions;
+    }
+
+    pub fn set_flags(&mut self, flags: TextureFlags) {
+        self.flags = flags.inner;
+    }
+
+    pub fn set_format(&mut self, format: RenderFormat) {
+        self.format = format;
+    }
+
+    pub fn set_num_mip_levels(&mut self, num_mip_levels: MipLevels) {
+        self.num_mip_levels = num_mip_levels;
+    }
+
+    pub fn set_default_mip_level(&mut self, default_mip_level: u8) {
+        self.default_mip_level = default_mip_level;
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn set_texd_identifier(&mut self, texd_identifier: u32) {
+        self.texd_identifier = texd_identifier;
+    }
+
+    pub fn set_mip_filter(&mut self, mip_filter: MipFilter) {
+        self.mip_filter = mip_filter;
+    }
 }
 
 /// Builder struct for constructing TextureMap instances.
 /// Will enable the [`unknown3`] flag by default.
 pub struct TextureMapBuilder {
-    params: TextureMapParams,
+    params: TextureMapParameters,
     atlas_data: Option<AtlasData>,
     image: ScratchImage,
     use_mipblock1: bool,
 }
 
 impl TextureMapBuilder {
-    /// Creates a new TextureMapBuilder with default settings.
+    pub fn from_dds<R: Read>(mut reader: R) -> Result<Self, TexturePackerError> {
+        let mut image_data = vec![];
+        reader
+            .read_to_end(&mut image_data)
+            .map_err(TexturePackerError::IoError)?;
+        let image = ScratchImage::load_dds(
+            image_data.as_slice(),
+            DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT,
+            None,
+            None,
+        )
+        .map_err(DirectXTexError)?;
+
+        Self::from_scratch_image(image)
+    }
+
     pub fn from_tga<R: Read>(mut reader: R) -> Result<Self, TexturePackerError> {
         let mut image_data = vec![];
         reader
@@ -92,7 +195,22 @@ impl TextureMapBuilder {
             .map_err(TexturePackerError::IoError)?;
         let image = ScratchImage::load_tga(image_data.as_slice(), TGA_FLAGS::TGA_FLAGS_NONE, None)
             .map_err(DirectXTexError)?;
+        Self::from_scratch_image(image)
+    }
 
+    #[cfg(feature = "image")]
+    pub fn from_dynamic_image(image: DynamicImage) -> Result<Self, TexturePackerError> {
+        let scratch_image = crate::image::dynamic_image_to_scratch_image(
+            image.as_bytes(),
+            image.width(),
+            image.height(),
+            image.color().into(),
+        )
+        .map_err(|e| PackingError(e.to_string()))?;
+        Self::from_scratch_image(scratch_image)
+    }
+
+    pub(crate) fn from_scratch_image(image: ScratchImage) -> Result<Self, TexturePackerError> {
         let metadata = image.metadata();
         let render_format = metadata.format.try_into().or_else(|_err| {
             let bits_per_pixel = metadata.format.bits_per_pixel();
@@ -113,7 +231,7 @@ impl TextureMapBuilder {
         })?;
 
         Ok(Self {
-            params: TextureMapParams::new(render_format),
+            params: TextureMapParameters::new(render_format),
             atlas_data: None,
             image,
             use_mipblock1: true,
@@ -121,10 +239,10 @@ impl TextureMapBuilder {
     }
 
     pub fn from_texture_map(texture: &TextureMap) -> Result<Self, TexturePackerError> {
-        let mut builder = convert::create_tga(texture)
-            .map(|tga| {
-                let reader = Cursor::new(tga);
-                Self::from_tga(reader)
+        let mut builder = convert::create_dds(texture)
+            .map(|dds| {
+                let reader = Cursor::new(dds);
+                Self::from_dds(reader)
             })
             .map_err(|e| PackingError(format!("Failed to convert texture: {e}")))??;
 
@@ -136,34 +254,44 @@ impl TextureMapBuilder {
         Ok(builder)
     }
 
+    pub fn with_params(mut self, params: TextureMapParameters) -> Self {
+        self.params = params;
+        self
+    }
+
     // Builder methods for each field
     pub fn texture_type(mut self, texture_type: TextureType) -> Self {
-        self.params.texture_type = texture_type;
+        self.params.set_texture_type(texture_type);
+        self
+    }
+
+    pub fn with_texture_type(mut self, texture_type: TextureType) -> Self {
+        self.params.set_texture_type(texture_type);
         self
     }
 
     pub fn with_default_mip_level(mut self, level: u8) -> Self {
-        self.params.default_mip_level = level;
+        self.params.set_default_mip_level(level);
         self
     }
 
     pub fn with_num_mip_levels(mut self, levels: MipLevels) -> Self {
-        self.params.num_mip_levels = levels;
+        self.params.set_num_mip_levels(levels);
         self
     }
 
     pub fn with_format(mut self, format: RenderFormat) -> Self {
-        self.params.format = format;
+        self.params.set_format(format);
         self
     }
 
     pub fn interpret_as(mut self, interpret_as: InterpretAs) -> Self {
-        self.params.interpret_as = interpret_as;
+        self.params.set_interpret_as(interpret_as);
         self
     }
 
     pub fn with_mip_filter(mut self, mip_filter: MipFilter) -> Self {
-        self.params.mip_filter = mip_filter;
+        self.params.set_mip_filter(mip_filter);
         self
     }
 
@@ -179,19 +307,19 @@ impl TextureMapBuilder {
     }
 
     pub fn with_flags(mut self, flags: TextureFlags) -> Self {
-        self.params.flags = flags.inner;
+        self.params.set_flags(flags);
         self
     }
 
     #[cfg(feature = "unstable")]
     pub fn with_dimensions(mut self, dimensions: Dimensions) -> Self {
-        self.params.dimensions = dimensions;
+        self.params.set_dimensions(dimensions);
         self
     }
 
     #[cfg(feature = "unstable")]
     pub fn with_texd_id(mut self, texd_id: u32) -> Self {
-        self.params.texd_identifier = texd_id;
+        self.params.set_texd_id(texd_id);
         self
     }
 
@@ -245,13 +373,19 @@ impl TextureMapBuilder {
             )));
         }
 
+        let mut filter = match self.params.mip_filter {
+            MipFilter::Nearest => TEX_FILTER_FLAGS::TEX_FILTER_POINT,
+            MipFilter::Linear => TEX_FILTER_FLAGS::TEX_FILTER_LINEAR,
+            MipFilter::Cubic => TEX_FILTER_FLAGS::TEX_FILTER_CUBIC,
+            MipFilter::Box => TEX_FILTER_FLAGS::TEX_FILTER_BOX,
+        };
+
+        if cfg!(windows) {
+            filter |= TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC;
+        }
+
         let mut image = self.image.generate_mip_maps(
-            match self.params.mip_filter {
-                MipFilter::Nearest => TEX_FILTER_FLAGS::TEX_FILTER_POINT,
-                MipFilter::Linear => TEX_FILTER_FLAGS::TEX_FILTER_LINEAR,
-                MipFilter::Cubic => TEX_FILTER_FLAGS::TEX_FILTER_CUBIC,
-                MipFilter::Box => TEX_FILTER_FLAGS::TEX_FILTER_BOX,
-            } | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC,
+            filter,
             match self.params.num_mip_levels {
                 MipLevels::All => 0,
                 MipLevels::Limit(n) => n as usize,

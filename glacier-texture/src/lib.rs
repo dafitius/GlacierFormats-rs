@@ -9,6 +9,8 @@ pub mod pack;
 pub mod enums;
 pub mod mipblock;
 pub mod atlas;
+#[cfg(feature = "image")]
+pub mod image;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum WoaVersion {
