@@ -66,6 +66,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     package.with_resource(texture_resource);
 
-    package.build_to_file(PackageVersion::RPKGv2, "./target".as_ref())?;
+    package.build_to_file(PackageVersion::RPKGv2, "./target".to_owned())?;
     Ok(())
 }

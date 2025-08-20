@@ -114,7 +114,8 @@ fn write_all_text_texd_in_game(woa_version: rpkg_rs::WoaVersion, game_paths: Gam
                         texture_map.set_mipblock1(MipblockData::from_memory(&texd_data, woa_version.into()).unwrap());
                     }
                     let packer = TextureMapBuilder::from_texture_map(&texture_map).unwrap();
-                    let vec = packer.build(woa_version.into()).unwrap().serialize().unwrap();
+                    let texture = packer.build(woa_version.into()).unwrap();
+                    let vec = GlacierResource::serialize(&texture, woa_version.into()).unwrap();
 
                     // if (data != vec){
                     //     fs::write(format!("./{}.TEXT",resource.rrid()), data.clone()).unwrap();
@@ -127,7 +128,8 @@ fn write_all_text_texd_in_game(woa_version: rpkg_rs::WoaVersion, game_paths: Gam
                     // assert_eq!(data, vec);
 
                     if !texd_data.is_empty(){
-                        let rebuilt_texd = texture_map.mipblock1().unwrap().serialize(woa_version).unwrap();
+                        let mipblock_data = texture_map.mipblock1().unwrap();
+                        let rebuilt_texd = GlacierResource::serialize(&mipblock_data, woa_version).unwrap();
                         if rebuilt_texd != texd_data {
                             fs::write("./comp1.TEXD", rebuilt_texd.clone()).unwrap();
                             fs::write("./comp2.TEXD", texd_data.clone()).unwrap();
