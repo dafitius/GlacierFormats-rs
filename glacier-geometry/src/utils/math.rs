@@ -1,11 +1,9 @@
 use std::iter::Sum;
 use std::ops;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add};
 use bincode::Encode;
 use binrw::{BinRead, BinWrite};
-use itertools::Position;
-use nalgebra::{Matrix4, UnitQuaternion};
-use crate::utils::buffer::VertexWeights;
+use nalgebra::UnitQuaternion;
 
 #[derive(BinRead, BinWrite, Debug, Clone, Copy, PartialEq, Encode)]
 pub struct Quaternion {

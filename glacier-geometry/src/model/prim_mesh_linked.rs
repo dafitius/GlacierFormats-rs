@@ -4,16 +4,16 @@ use crate::utils::math::Vector4;
 use crate::mesh::prim_sub_mesh::PrimSubMesh;
 use crate::render_primitive::PrimPropertyFlags;
 use crate::model::prim_mesh::PrimMesh;
-use std::io::{Read, Seek, Write};
-use binrw::{binread, BinRead, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
+use std::io::{Seek, Write};
+use binrw::{binread, binrw, BinRead, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
 use bit_set::BitSet;
-use itertools::Itertools;
-use crate::model::prim_mesh_weighted::{BoneAccel, BoneIndices, CopyBones, PrimMeshWeighted};
+use crate::model::prim_mesh_weighted::{BoneAccel, BoneInfo};
+use crate::WoaVersion;
 
 #[binread]
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
-#[br(import(global_properties: PrimPropertyFlags))]
+#[br(import(global_properties: PrimPropertyFlags, woa_version: WoaVersion))]
 pub struct PrimMeshLinked
 {
     #[br(args(global_properties))]
@@ -29,7 +29,26 @@ pub struct PrimMeshLinked
     pub unk_2: u32,
 
     #[br(parse_with = FilePtr32::parse)]
-    pub bone_info: BoneInfo,
+    #[br(args{inner: (woa_version,)})]
+    pub bone_info: BoneInfoHolder,
+}
+
+#[binrw]
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Clone)]
+#[br(import(woa_version: WoaVersion))]
+#[bw(import(bone_coli_offset: &mut u32))]
+pub enum BoneInfoHolder{
+    #[br(pre_assert(woa_version == WoaVersion::HM2016))]
+    Normal(
+        #[bw(args(bone_coli_offset))]
+        BoneInfo
+    ),
+    #[br(pre_assert(woa_version != WoaVersion::HM2016))]
+    Compact(
+        #[bw(args(bone_coli_offset))]
+        CompactBoneInfo
+    ),
 }
 
 
@@ -91,7 +110,7 @@ fn reverse_u64_bits(mut value: u64) -> u64 {
 
 #[binread]
 #[derive(Debug, PartialEq, Clone)]
-pub struct BoneInfo
+pub struct CompactBoneInfo
 {
     #[br(temp)]
     pub total_size: u16,
@@ -113,11 +132,11 @@ pub struct BoneInfo
     pub accel_entries: Vec<BoneAccel>,
 }
 
-impl BinWrite for BoneInfo {
-    type Args<'a> = &'a mut u32;
+impl BinWrite for CompactBoneInfo {
+    type Args<'a> = (&'a mut u32,);
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
-        *args = writer.stream_position()? as u32;
+        *args.0 = writer.stream_position()? as u32;
 
         // let bit_vec = self.bone_remap.clone().into_bit_vec();
         // let size : u32 = bit_vec.len() as u32;
@@ -150,7 +169,7 @@ impl BinWrite for PrimMeshLinked {
         PrimSubMesh::write_options(&self.prim_mesh.sub_mesh, writer, endian, (&self.prim_mesh, args.0, &mut sub_mesh_ptr))?;
 
         let mut coli_bone_ptr: u32 = 0;
-        BoneInfo::write_options(&self.bone_info, writer, endian, &mut coli_bone_ptr)?;
+        BoneInfoHolder::write_options(&self.bone_info, writer, endian, (&mut coli_bone_ptr,))?;
 
         *args.1 = writer.stream_position()? as u32;
         PrimObject::write_options(&self.prim_mesh.prim_object, writer, endian, (self.prim_mesh.calc_bb(),))?;

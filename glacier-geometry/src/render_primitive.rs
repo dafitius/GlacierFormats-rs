@@ -1,27 +1,28 @@
 
 use crate::utils::io::align_writer;
-use std::{fs, io};
+use std::fs;
 use std::io::{Cursor, Read, Seek, Write};
 use std::path::{Path};
 use binrw::{BinRead, binread, BinReaderExt, BinResult, BinWrite, BinWriterExt, Endian, FilePtr64};
 use binrw::io::SeekFrom;
 use bitfield_struct::bitfield;
 use byte_slice_cast::{AsByteSlice, AsSliceOf};
-use itertools::{izip, Either, Itertools};
-use num_traits::zero;
+use itertools::{izip, Either};
 use crate::model::prim_mesh::PrimMesh;
 use crate::model::prim_mesh_weighted::PrimMeshWeighted;
-use crate::model::prim_object::ObjectPropertyFlags;
 use crate::utils::math::{BoundingBox, Color, Vector2, Vector3, Vector4};
 use wide::f32x4;
 use crate::model::prim_mesh_linked::PrimMeshLinked;
 use crate::utils::buffer::{IndexBuffer, Vertex, VertexWeights};
+use crate::WoaVersion;
 
 #[binread]
 #[derive(Debug, PartialEq, Clone)]
 #[brw(little)]
+#[br(import(woa_version: WoaVersion))]
 pub struct RenderPrimitive {
     #[br(parse_with = FilePtr64::parse)]
+    #[br(args{ inner: (woa_version,)})]
     data: PrimObjectHeader,
 }
 
@@ -37,14 +38,14 @@ pub enum LodLevel{
 }
 
 impl RenderPrimitive {
-    pub fn parse(path: &Path) -> BinResult<RenderPrimitive> {
+    pub fn parse(path: &Path, woa_version: WoaVersion) -> BinResult<RenderPrimitive> {
         let mut reader = Cursor::new(fs::read(path).unwrap());
-        let prim: RenderPrimitive = reader.read_ne()?;
+        let prim: RenderPrimitive = reader.read_le_args((woa_version,))?;
         Ok(prim)
     }
 
-    pub fn parse_bytes<A : Read + Seek>(data: &mut A) -> BinResult<RenderPrimitive> {
-        let prim = RenderPrimitive::read_le_args(data, ())?;
+    pub fn parse_bytes<A : Read + Seek>(data: &mut A, woa_version: WoaVersion) -> BinResult<RenderPrimitive> {
+        let prim : RenderPrimitive= data.read_le_args((woa_version,))?;
         Ok(prim)
     }
 
@@ -103,6 +104,7 @@ impl BinWrite for RenderPrimitive {
 #[binread]
 #[allow(dead_code, unused_variables)]
 #[derive(Debug, PartialEq, Clone)]
+#[br(import(woa_version: WoaVersion))]
 pub struct PrimObjectHeader
 {
     pub prims: PrimHeader,
@@ -117,7 +119,7 @@ pub struct PrimObjectHeader
 
     #[br(
     parse_with = parse_objects,
-    args(num_objects, property_flags,),
+    args(num_objects, property_flags, woa_version),
     )]
     pub objects: Vec<MeshObject>,
 
@@ -167,7 +169,7 @@ impl BinWrite for PrimObjectHeader {
 }
 
 #[derive(BinRead, Debug, PartialEq, Clone)]
-#[br(import(global_properties: PrimPropertyFlags))]
+#[br(import(global_properties: PrimPropertyFlags, woa_version: WoaVersion))]
 pub enum MeshObject {
     #[br(pre_assert(!global_properties.is_weighted_object() && !global_properties.is_linked_object()))]
     Normal(
@@ -181,7 +183,7 @@ pub enum MeshObject {
     ),
     #[br(pre_assert(global_properties.is_linked_object()))]
     Linked(
-        #[br(args(global_properties))]
+        #[br(args(global_properties, woa_version))]
         PrimMeshLinked
     )
 }
@@ -489,7 +491,7 @@ pub enum PrimType
 }
 
 #[binrw::parser(reader, endian)]
-fn parse_objects(object_count: u32, global_properties: PrimPropertyFlags) -> BinResult<Vec<MeshObject>> {
+fn parse_objects(object_count: u32, global_properties: PrimPropertyFlags, woa_version: WoaVersion) -> BinResult<Vec<MeshObject>> {
     let table_offset = u32::read_options(reader, endian, ())?;
     let saved_pos = reader.stream_position()?;
     reader.seek(SeekFrom::Start(table_offset as u64))?;
@@ -501,7 +503,7 @@ fn parse_objects(object_count: u32, global_properties: PrimPropertyFlags) -> Bin
     let mut objects = vec![];
     for offset in offset_table.flatten().collect::<Vec<_>>() {
         reader.seek(SeekFrom::Start(offset as u64))?;
-        objects.push(MeshObject::read_options(reader, endian, (global_properties, ))?);
+        objects.push(MeshObject::read_options(reader, endian, (global_properties, woa_version))?);
     }
 
     reader.seek(SeekFrom::Start(saved_pos))?;

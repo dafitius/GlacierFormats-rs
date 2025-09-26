@@ -1,13 +1,7 @@
 
-use std::io::{Read, Seek, Write};
-use std::marker::PhantomData;
+use std::io::{Seek, Write};
 use bincode::Encode;
-use binrw::{BinRead, BinResult, BinWrite, BinWriterExt, Endian};
-use num_traits::Bounded;
-
-use crate::model::prim_mesh::PrimMesh;
-use crate::model::prim_object::ObjectPropertyFlags;
-use crate::render_primitive::PrimPropertyFlags;
+use binrw::{BinResult, BinWrite, Endian};
 use crate::utils::math::{Color, Vector2, Vector4};
 
 pub type VertexPos = Vector4;

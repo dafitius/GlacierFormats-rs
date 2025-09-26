@@ -1,10 +1,9 @@
 use std::{fs, io};
 use std::fs::File;
 use crate::utils::math::{Matrix43, Quaternion, Transform, Vector3, Vector4};
-use binrw::{binread, binrw, BinRead, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32, NullString};
+use binrw::{binread, binrw, BinRead, BinResult, BinWrite, BinWriterExt, Endian, NullString};
 use std::io::{BufReader, BufWriter, Cursor, Seek, SeekFrom, Write};
 use std::path::Path;
-use itertools::Itertools;
 use crate::utils::io::{align_writer, FixedString};
 
 #[derive(BinRead, BinWrite, Debug, PartialEq, Clone, Copy)]
@@ -304,7 +303,7 @@ pub struct PoseBoneInfo{
 }
 
 impl BinWrite for PoseBoneInfo{
-    type Args<'a> = (&'a mut u32);
+    type Args<'a> = &'a mut u32;
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
 
@@ -333,7 +332,7 @@ impl BinWrite for PoseBoneInfo{
             if i == 0 { acc.push(0); return acc; }
             let last_size = acc.last().unwrap_or(&0u32);
             let last_name = self.pose_name_list.get(i-1).map(|v|v.len()).unwrap_or(0);
-            acc.push( (last_size + last_name as u32 + 1));
+            acc.push( last_size + last_name as u32 + 1);
             acc
         });
 

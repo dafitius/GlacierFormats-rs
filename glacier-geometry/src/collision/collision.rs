@@ -57,7 +57,7 @@ pub struct BoneColi {
     pub num_blocks: u16,
     pub total_chunks_align: u16,
 
-    #[br(count = (total_size - 6))]
+    #[br(count = total_size - 6)]
     pub data: Vec<u8>,
 }
 

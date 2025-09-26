@@ -1,5 +1,5 @@
 use std::fmt::{Debug};
-use binrw::{binrw, binwrite, BinRead};
+use binrw::{binrw, BinRead};
 use std::io::{Read, Seek, Write};
 use std::ops::Index;
 use binrw::{binread, BinResult, BinWrite, BinWriterExt, Endian};
@@ -117,8 +117,7 @@ pub struct PackHeader
 
 #[binrw]
 #[derive(Clone, Debug, PartialEq)]
-#[br(import{
-total_size: u16})]
+#[br(import{total_size: u16})]
 pub struct SimulationProperties
 {
     root_bone: u32,
@@ -237,7 +236,7 @@ impl Index<Neighbor> for GridPoint {
 impl BinRead for GridPoint {
     type Args<'a> = ();
 
-    fn read_options<R: Read + Seek>(reader: &mut R, endian: Endian, args: Self::Args<'_>) -> BinResult<Self> {
+    fn read_options<R: Read + Seek>(reader: &mut R, endian: Endian, _: Self::Args<'_>) -> BinResult<Self> {
         fn read_optional_u16(reader: &mut (impl Read + std::io::Seek), endian: Endian) -> BinResult<Option<u16>> {
             let value = u16::read_options(reader, endian, ())?;
             Ok(if value == u16::MAX { None } else { Some(value) })
@@ -258,7 +257,7 @@ impl BinRead for GridPoint {
 impl BinWrite for GridPoint {
     type Args<'a> = ();
 
-    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
+    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, _: Self::Args<'_>) -> BinResult<()> {
         writer.write_type(&self.down.unwrap_or(u16::MAX), endian)?;
         writer.write_type(&self.down_right.unwrap_or(u16::MAX), endian)?;
         writer.write_type(&self.right.unwrap_or(u16::MAX), endian)?;

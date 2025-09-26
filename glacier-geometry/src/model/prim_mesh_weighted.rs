@@ -5,10 +5,8 @@ use crate::mesh::prim_sub_mesh::PrimSubMesh;
 use crate::render_primitive::PrimPropertyFlags;
 use crate::model::prim_mesh::PrimMesh;
 use std::io::{Seek, SeekFrom, Write};
-use binrw::{binread, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
+use binrw::{binread, BinResult, BinWrite, BinWriterExt, Endian};
 use binrw::file_ptr::NonZeroFilePtr32;
-use itertools::Itertools;
-use crate::model::prim_mesh_linked::PrimMeshLinked;
 
 #[binread]
 #[allow(dead_code)]
@@ -52,7 +50,7 @@ impl BinWrite for PrimMeshWeighted {
         PrimSubMesh::write_options(&self.prim_mesh.sub_mesh, writer, endian, (&self.prim_mesh, args.0, &mut sub_mesh_ptr))?;
 
         let mut bone_info_ptr: u32 = 0;
-        BoneInfo::write_options(&self.bone_info, writer, endian, &mut bone_info_ptr)?;
+        BoneInfo::write_options(&self.bone_info, writer, endian, (&mut bone_info_ptr,))?;
 
 
         let mut bone_indices_ptr: u32 = 0;
@@ -145,10 +143,10 @@ pub struct BoneInfo
 }
 
 impl BinWrite for BoneInfo{
-    type Args<'a> = &'a mut u32;
+    type Args<'a> = (&'a mut u32,);
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
-        *args = writer.stream_position()? as u32;
+        *args.0 = writer.stream_position()? as u32;
 
         let total_size = 4 +
             (self.bone_remap.len() + 1) +
