@@ -7,5 +7,6 @@ members = [
 
     #new crate impl
     "glacier-texture",
-    "glacier-ini"
+    "glacier-ini",
+    "glacier-render"
 ]
