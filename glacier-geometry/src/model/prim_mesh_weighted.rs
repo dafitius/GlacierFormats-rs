@@ -85,7 +85,7 @@ impl BinWrite for PrimMeshWeighted {
 
 
 #[binread]
-#[derive(Debug, BinWrite, Default, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 #[br(import{count: u32})]
 pub struct CopyBones
 {
@@ -102,6 +102,20 @@ impl CopyBones {
     }
 }
 
+impl BinWrite for CopyBones {
+    type Args<'a> = (&'a mut u32,);
+
+    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
+        *args.0 = writer.stream_position()? as u32;
+
+        self.indices.write_le(writer)?;
+        self.offsets.write_le(writer)?;
+        align_writer(writer, 16)?;
+
+        Ok(())
+    }
+}
+
 #[binread]
 #[derive(Debug, PartialEq, Clone)]
 pub struct BoneIndices
@@ -109,7 +123,10 @@ pub struct BoneIndices
     #[br(temp)]
     pub count: u32,
 
-    #[brw(count = count as usize)]
+    // #[br(temp)]
+    // pub count2: u32,
+
+    #[brw(count = count as usize - 2)]
     pub indices: Vec<u16>,
 }
 
@@ -118,7 +135,7 @@ impl BinWrite for BoneIndices {
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
         *args = writer.stream_position()? as u32;
-        writer.write_type(&(self.indices.len() as u32), endian)?;
+        writer.write_type(&((self.indices.len() + 2) as u32), endian)?;
         writer.write_type(&self.indices, endian)?;
         align_writer(writer, 16)?;
         Ok(())

@@ -217,8 +217,8 @@ impl MeshObject {
             normals.len() == len
                 && tangents.len() == len
                 && bitangents.len() == len
-                && tex_coords.len() == len,
-            "All vertex attribute slices must have the same length"
+                && tex_coords.iter().all(|coords| coords.len() == len),
+            "All vertex attribute slices must have the same length (pos: {}, normal: {}, tangent: {}, bitangent: {})", len, normals.len(), tangents.len(), bitangents.len()
         );
 
         // Create iterators for each attribute

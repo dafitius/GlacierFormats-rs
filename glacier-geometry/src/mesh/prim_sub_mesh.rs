@@ -105,7 +105,7 @@ impl BinWrite for PrimSubMesh {
         VertexBuffers::write_options(&self.buffers, writer, endian, ())?;
         align_writer(writer, 16)?;
 
-        if !property_flags.is_linked_object() {
+        if !property_flags.is_linked_object() && !property_flags.is_weighted_object() {
             collision_offset = writer.stream_position()? as u32;
             writer.write_type(&self.collision, endian)?;
             align_writer(writer, 16)?;
@@ -114,6 +114,12 @@ impl BinWrite for PrimSubMesh {
         let cloth_offset = writer.stream_position()? as u32;
         if let Some(cloth_data) = &self.cloth_data{
             writer.write_type(cloth_data, endian)?;
+            align_writer(writer, 16)?;
+        }
+
+        if property_flags.is_weighted_object() {
+            collision_offset = writer.stream_position()? as u32;
+            writer.write_type(&self.collision, endian)?;
             align_writer(writer, 16)?;
         }
 

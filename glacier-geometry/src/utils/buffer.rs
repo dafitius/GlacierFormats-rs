@@ -16,6 +16,7 @@ pub struct VertexMain
     pub uvs: Vec<Vector2>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct Vertex {
     pub position: Vector4,
     pub normal: Vector4,

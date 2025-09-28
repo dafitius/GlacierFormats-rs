@@ -1,4 +1,4 @@
-use std::fmt::{Debug};
+use std::fmt::{Debug, Display, Formatter};
 use binrw::{binrw, BinRead};
 use std::io::{Read, Seek, Write};
 use std::ops::Index;
@@ -63,10 +63,14 @@ pub struct ClothSimPack {
     #[br(if(header.properties_size > 0), args{total_size: header.properties_size})]
     pub simulation_properties: Option<SimulationProperties>,
 
-    #[br(count = (header.grid_size as usize / size_of::<GridPoint>()) * 2)]
+    #[br(temp)]
+    #[br(calc(GRIDPOINT_SIZE))]
+    pub count: usize,
+
+    #[br(count = (header.grid_size as usize / GRIDPOINT_SIZE))]
     pub grid_points: Vec<GridPoint>,
 
-    #[br(count = header.unknown_count)]
+    #[br(count = header.unknown_count as usize)]
     pub unknown: Vec<UnkStruct>,
 }
 
@@ -90,9 +94,10 @@ impl BinWrite for ClothSimPack {
             }
         };
         let unknown_count = self.unknown.len() as u16;
-        let grid_size = (self.grid_points.len() * size_of::<GridPoint>()) as u32 / 2;
+        let bytes = self.grid_points.len() * GRIDPOINT_SIZE;
+        let grid_size = (bytes as u32).next_multiple_of(16);
         let header = PackHeader{
-            data_size: size_of::<PackHeader>() as u32 + properties_size as u32 + (unknown_count * 4) as u32 + grid_size,
+            data_size: size_of::<PackHeader>() as u32 + properties_size as u32 + (unknown_count + 6) as u32 + grid_size,
             properties_size,
             unknown_count,
             grid_size,
@@ -109,6 +114,7 @@ impl BinWrite for ClothSimPack {
 #[derive(BinRead, BinWrite, Debug, PartialEq, Default, Clone)]
 pub struct PackHeader
 {
+    // #[br(dbg)]
     pub(crate) data_size: u32,
     pub(crate) properties_size: u16,
     pub(crate) unknown_count: u16,
@@ -120,6 +126,7 @@ pub struct PackHeader
 #[br(import{total_size: u16})]
 pub struct SimulationProperties
 {
+    // #[br(dbg)]
     root_bone: u32,
     frequency: f32,
     collision_offset: f32,
@@ -131,15 +138,15 @@ pub struct SimulationProperties
     collision_groups: u32,
 
     #[br(map = |x: u8| x > 0)]
-    #[bw(map = |x| if *x {1} else {0})]
+    #[bw(map = |x| if *x {1u8} else {0u8})]
     use_per_vertex_stiffness: bool,
 
     #[br(map = |x: u8| x > 0)]
-    #[bw(map = |x| if *x {1} else {0})]
+    #[bw(map = |x| if *x {1u8} else {0u8})]
     use_per_vertex_damping: bool,
 
     #[br(map = |x: u8| x > 0)]
-    #[bw(map = |x| if *x {1} else {0})]
+    #[bw(map = |x| if *x {1u8} else {0u8})]
     use_per_vertex_skinning: bool,
 
     #[br(temp)]
@@ -180,19 +187,19 @@ struct ConstrainProperties
     num_anchor_stretch_direction: u32,
 
     #[br(map = |x: u8| x > 0)]
-    #[bw(map = |x| if *x {1} else {0})]
+    #[bw(map = |x| if *x {1u8} else {0u8})]
     use_parent_dist_constrains: bool,
 
     #[br(map = |x: u8| x > 0)]
-    #[bw(map = |x| if *x {1} else {0})]
+    #[bw(map = |x| if *x {1u8} else {0u8})]
     use_sphere_skinning_constrains: bool,
 
     #[br(map = |x: u8| x > 0)]
-    #[bw(map = |x| if *x {1} else {0})]
+    #[bw(map = |x| if *x {1u8} else {0u8})]
     use_pos_normal_constrains: bool,
 
     #[br(map = |x: u8| x > 0)]
-    #[bw(map = |x| if *x {1} else {0})]
+    #[bw(map = |x| if *x {1u8} else {0u8})]
     use_neg_normal_constrains: bool,
 }
 
@@ -203,6 +210,7 @@ struct ConstrainProperties
 enum Neighbor { Down, DownRight, Right, UpRight, Up, UpLeft, Left, DownLeft }
 
 
+const GRIDPOINT_SIZE : usize = 0x10;
 #[derive(Debug, PartialEq, Clone)]
 pub struct GridPoint
 {

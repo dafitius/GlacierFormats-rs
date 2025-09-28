@@ -4,10 +4,11 @@ use crate::utils::math::Vector4;
 use crate::mesh::prim_sub_mesh::PrimSubMesh;
 use crate::render_primitive::PrimPropertyFlags;
 use crate::model::prim_mesh::PrimMesh;
-use std::io::{Seek, Write};
+use std::io::{Seek, SeekFrom, Write};
 use binrw::{binread, binrw, BinRead, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
+use binrw::file_ptr::NonZeroFilePtr32;
 use bit_set::BitSet;
-use crate::model::prim_mesh_weighted::{BoneAccel, BoneInfo};
+use crate::model::prim_mesh_weighted::{BoneAccel, BoneIndices, BoneInfo, CopyBones};
 use crate::WoaVersion;
 
 #[binread]
@@ -20,15 +21,21 @@ pub struct PrimMeshLinked
     pub prim_mesh: PrimMesh,
 
     #[br(temp)]
-    pub unk_0: u32,
+    pub num_copy_bones: u32,
 
     #[br(temp)]
-    pub unk_1: u32,
+    pub copy_bones_offset: u32,
 
     #[br(temp)]
-    pub unk_2: u32,
+    pub unk2: u32,
 
-    #[br(parse_with = FilePtr32::parse)]
+    #[br(if(copy_bones_offset != 0),
+    seek_before = SeekFrom::Start(copy_bones_offset as u64),
+    restore_position,
+    args{ count: num_copy_bones })]
+    pub copy_bones: Option<CopyBones>,
+
+    #[br(parse_with = NonZeroFilePtr32::parse)]
     #[br(args{inner: (woa_version,)})]
     pub bone_info: BoneInfoHolder,
 }
@@ -125,7 +132,7 @@ pub struct CompactBoneInfo
     // #[br(dbg)]
     // pub bone_remap: BitSet,
 
-    #[br(count = (total_chunks_align + 63) / 64)]
+    #[br(count = (total_chunks_align + 64) / 64)]
     pub bone_remap: Vec<u64>,
 
     #[br(little, count = num_blocks)]
@@ -168,6 +175,12 @@ impl BinWrite for PrimMeshLinked {
         let mut sub_mesh_ptr: u32 = 0;
         PrimSubMesh::write_options(&self.prim_mesh.sub_mesh, writer, endian, (&self.prim_mesh, args.0, &mut sub_mesh_ptr))?;
 
+        let mut copy_bones_ptr: u32 = 0;
+        if let Some(copy_bones) = &self.copy_bones{
+            CopyBones::write_options(&copy_bones, writer, endian, (&mut copy_bones_ptr,))?;
+
+        }
+
         let mut coli_bone_ptr: u32 = 0;
         BoneInfoHolder::write_options(&self.bone_info, writer, endian, (&mut coli_bone_ptr,))?;
 
@@ -184,8 +197,8 @@ impl BinWrite for PrimMeshLinked {
         writer.write_type(&self.prim_mesh.tex_scale_bias, endian)?;
         writer.write_type(&(self.prim_mesh.cloth_id as u32), endian)?;
 
-        writer.write_type(&0u32, endian)?;
-        writer.write_type(&0u32, endian)?;
+        writer.write_type(&(self.copy_bones.as_ref().map(|c|c.indices.len()).unwrap_or_default() as u32), endian)?;
+        writer.write_type(&copy_bones_ptr, endian)?;
         writer.write_type(&0u32, endian)?;
         writer.write_type(&coli_bone_ptr, endian)?;
         align_writer(writer, 16)?;
