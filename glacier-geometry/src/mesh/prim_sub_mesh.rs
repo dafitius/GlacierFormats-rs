@@ -9,12 +9,13 @@ use crate::model::prim_object::{ObjectPropertyFlags, PrimObject};
 use crate::render_primitive::{PrimPropertyFlags};
 use crate::utils::buffer;
 use crate::utils::buffer::{IndexBuffer, VertexBuffers};
-
+use crate::WoaVersion;
 
 #[binread]
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
 #[br(import{
+woa_version: WoaVersion,
 global_properties: PrimPropertyFlags,
 mesh_properties: ObjectPropertyFlags,
 cloth_id: u8
@@ -50,6 +51,7 @@ pub struct PrimSubMesh
     pub cloth_offset : u32,
 
     #[br(pad_after(3))]
+    #[br(map(|n: u8| {n + if matches!(woa_version, WoaVersion::HM2016) && global_properties.is_weighted_object() {1} else {0}}))]
     pub num_uv_channels: u8,
 
     #[br(
@@ -81,12 +83,13 @@ pub struct PrimSubMesh
 
 
 impl BinWrite for PrimSubMesh {
-    type Args<'a> = (&'a PrimMesh, &'a PrimPropertyFlags, &'a mut u32);
+    type Args<'a> = (&'a WoaVersion, &'a PrimMesh, &'a PrimPropertyFlags, &'a mut u32);
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
 
-        let mesh = args.0;
-        let property_flags = args.1;
+        let woa_version = args.0;
+        let mesh = args.1;
+        let property_flags = args.2;
 
         let mut collision_offset = 0;
         if property_flags.is_linked_object() {
@@ -134,10 +137,13 @@ impl BinWrite for PrimSubMesh {
         writer.write_type(&collision_offset, endian)?;
 
         writer.write_type(&(if self.cloth_data.is_some() {cloth_offset} else {0}), endian)?; //cloth
-        writer.write_type(&(self.num_uv_channels as u32), endian)?;
+
+        let num_uv_channels = self.num_uv_channels - if matches!(woa_version, WoaVersion::HM2016) && property_flags.is_weighted_object() {1} else {0};
+
+        writer.write_type(&(num_uv_channels as u32), endian)?;
         align_writer(writer, 16)?;
 
-        *args.2 = writer.stream_position()? as u32;
+        *args.3 = writer.stream_position()? as u32;
 
         writer.write_type(&header_offset, endian)?;
         writer.write_type(&0u32, endian)?; //todo: change this to use align_writer

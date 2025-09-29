@@ -31,10 +31,9 @@ use crate::utils::math::Vector3;
 #[br(import{
 cloth_id: u8,
 num_vertices: u32})]
-//sim and cloth prims
 pub enum ClothSimMesh {
 
-    #[br(pre_assert(cloth_id & 0x80 == 0x80))] //disabled, is unstable
+    #[br(pre_assert(cloth_id & 0x80 == 0x80))]
     Simulation(ClothSimPack),
 
     #[br(pre_assert(cloth_id & 0x80 != 0x80))]

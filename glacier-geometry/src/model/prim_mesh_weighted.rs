@@ -1,3 +1,4 @@
+use crate::WoaVersion;
 use crate::utils::io::align_writer;
 use crate::model::prim_object::PrimObject;
 use crate::utils::math::Vector4;
@@ -11,10 +12,10 @@ use binrw::file_ptr::NonZeroFilePtr32;
 #[binread]
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
-#[br(import(global_properties: PrimPropertyFlags))]
+#[br(import(woa_version: WoaVersion, global_properties: PrimPropertyFlags))]
 pub struct PrimMeshWeighted
 {
-    #[br(args(global_properties))]
+    #[br(args(woa_version, global_properties))]
     pub prim_mesh: PrimMesh,
 
     #[br(temp)]
@@ -42,12 +43,12 @@ pub struct PrimMeshWeighted
 }
 
 impl BinWrite for PrimMeshWeighted {
-    type Args<'a> = (&'a PrimPropertyFlags, &'a mut u32);
+    type Args<'a> = (&'a WoaVersion, &'a PrimPropertyFlags, &'a mut u32);
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
 
         let mut sub_mesh_ptr: u32 = 0;
-        PrimSubMesh::write_options(&self.prim_mesh.sub_mesh, writer, endian, (&self.prim_mesh, args.0, &mut sub_mesh_ptr))?;
+        PrimSubMesh::write_options(&self.prim_mesh.sub_mesh, writer, endian, (args.0, &self.prim_mesh, args.1, &mut sub_mesh_ptr))?;
 
         let mut bone_info_ptr: u32 = 0;
         BoneInfo::write_options(&self.bone_info, writer, endian, (&mut bone_info_ptr,))?;
@@ -56,10 +57,10 @@ impl BinWrite for PrimMeshWeighted {
         let mut bone_indices_ptr: u32 = 0;
         BoneIndices::write_options(&self.bone_indices, writer, endian, &mut bone_indices_ptr)?;
 
-        *args.1 = writer.stream_position()? as u32;
+        *args.2 = writer.stream_position()? as u32;
         PrimObject::write_options(&self.prim_mesh.prim_object, writer, endian, (self.prim_mesh.calc_bb(),))?;
         writer.write_type(&sub_mesh_ptr, endian)?; //sub_mesh_offset
-        if args.0.has_highres_positions() {
+        if args.1.has_highres_positions() {
             writer.write_type(&Vector4{ x: 1.0, y: 1.0, z: 1.0, w: 1.0 },endian)?;
             writer.write_type(&Vector4{ x: 0.0, y: 0.0, z: 0.0, w: 0.0 },endian)?;
         }else{

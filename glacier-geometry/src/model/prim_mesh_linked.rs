@@ -14,10 +14,10 @@ use crate::WoaVersion;
 #[binread]
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
-#[br(import(global_properties: PrimPropertyFlags, woa_version: WoaVersion))]
+#[br(import(woa_version: WoaVersion, global_properties: PrimPropertyFlags))]
 pub struct PrimMeshLinked
 {
-    #[br(args(global_properties))]
+    #[br(args(woa_version, global_properties))]
     pub prim_mesh: PrimMesh,
 
     #[br(temp)]
@@ -168,12 +168,12 @@ impl BinWrite for CompactBoneInfo {
 }
 
 impl BinWrite for PrimMeshLinked {
-    type Args<'a> = (&'a PrimPropertyFlags, &'a mut u32);
+    type Args<'a> = (&'a WoaVersion, &'a PrimPropertyFlags, &'a mut u32);
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
 
         let mut sub_mesh_ptr: u32 = 0;
-        PrimSubMesh::write_options(&self.prim_mesh.sub_mesh, writer, endian, (&self.prim_mesh, args.0, &mut sub_mesh_ptr))?;
+        PrimSubMesh::write_options(&self.prim_mesh.sub_mesh, writer, endian, (args.0, &self.prim_mesh, args.1, &mut sub_mesh_ptr))?;
 
         let mut copy_bones_ptr: u32 = 0;
         if let Some(copy_bones) = &self.copy_bones{
@@ -184,10 +184,10 @@ impl BinWrite for PrimMeshLinked {
         let mut coli_bone_ptr: u32 = 0;
         BoneInfoHolder::write_options(&self.bone_info, writer, endian, (&mut coli_bone_ptr,))?;
 
-        *args.1 = writer.stream_position()? as u32;
+        *args.2 = writer.stream_position()? as u32;
         PrimObject::write_options(&self.prim_mesh.prim_object, writer, endian, (self.prim_mesh.calc_bb(),))?;
         writer.write_type(&sub_mesh_ptr, endian)?; //sub_mesh_offset
-        if args.0.has_highres_positions() {
+        if args.1.has_highres_positions() {
             writer.write_type(&Vector4{ x: 1.0, y: 1.0, z: 1.0, w: 1.0 },endian)?;
             writer.write_type(&Vector4{ x: 0.0, y: 0.0, z: 0.0, w: 0.0 },endian)?;
         }else{
