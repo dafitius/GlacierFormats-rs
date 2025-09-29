@@ -5,10 +5,10 @@ use crate::mesh::prim_sub_mesh::PrimSubMesh;
 use crate::render_primitive::PrimPropertyFlags;
 use crate::model::prim_mesh::PrimMesh;
 use std::io::{Seek, SeekFrom, Write};
-use binrw::{binread, binrw, BinRead, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
+use binrw::{binread, binrw, BinRead, BinResult, BinWrite, BinWriterExt, Endian};
 use binrw::file_ptr::NonZeroFilePtr32;
 use bit_set::BitSet;
-use crate::model::prim_mesh_weighted::{BoneAccel, BoneIndices, BoneInfo, CopyBones};
+use crate::model::prim_mesh_weighted::{BoneAccel, BoneInfo, CopyBones};
 use crate::WoaVersion;
 
 #[binread]
@@ -27,7 +27,7 @@ pub struct PrimMeshLinked
     pub copy_bones_offset: u32,
 
     #[br(temp)]
-    pub unk2: u32,
+    pub _unk2: u32,
 
     #[br(if(copy_bones_offset != 0),
     seek_before = SeekFrom::Start(copy_bones_offset as u64),
@@ -59,14 +59,14 @@ pub enum BoneInfoHolder{
 }
 
 
-#[binrw::parser(reader, endian)]
+#[binrw::parser(reader)]
 fn parse_bone_remap(total_chunks_align: u32) -> BinResult<BitSet> {
     let mut bitset = BitSet::with_capacity(total_chunks_align as usize);
     let u64_count = ((total_chunks_align as f32 + 0.001) / 64.0).ceil() as usize;
 
-    let values : Vec<u64>= (0..u64_count).map(|_| {
+    let values : Vec<u64>= (0..u64_count).flat_map(|_| {
         u64::read_le(reader)
-    }).flatten().collect::<Vec<_>>();
+    }).collect::<Vec<_>>();
 
     for (i, value) in values.iter().rev().enumerate() {
         for bit in 0..64 {
@@ -84,8 +84,8 @@ fn bitset_to_bytes(bitset: &BitSet) -> BinResult<Vec<u8>> {
     let mut buffer = vec![];
     let bit_vec = bitset.clone().into_bit_vec();
     let size = bit_vec.len();
-    let aligned_size = ((size + 63) / 64) + size;
-    let mut values = vec![0u64; (aligned_size + 63) / 64];
+    let aligned_size = size.div_ceil(64);
+    let mut values = vec![0u64; aligned_size.div_ceil(64)];
 
     for (i, bit) in bit_vec.iter().enumerate() {
         if bit {
@@ -120,7 +120,7 @@ fn reverse_u64_bits(mut value: u64) -> u64 {
 pub struct CompactBoneInfo
 {
     #[br(temp)]
-    pub total_size: u16,
+    pub _total_size: u16,
 
     #[br(temp)]
     pub num_blocks: u16,
@@ -177,7 +177,7 @@ impl BinWrite for PrimMeshLinked {
 
         let mut copy_bones_ptr: u32 = 0;
         if let Some(copy_bones) = &self.copy_bones{
-            CopyBones::write_options(&copy_bones, writer, endian, (&mut copy_bones_ptr,))?;
+            CopyBones::write_options(copy_bones, writer, endian, (&mut copy_bones_ptr,))?;
 
         }
 

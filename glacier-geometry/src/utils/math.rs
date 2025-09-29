@@ -19,8 +19,8 @@ impl Default for Quaternion {
     }
 }
 
-impl From<nalgebra::UnitQuaternion<f32>> for Quaternion {
-    fn from(value: nalgebra::UnitQuaternion<f32>) -> Self {
+impl From<UnitQuaternion<f32>> for Quaternion {
+    fn from(value: UnitQuaternion<f32>) -> Self {
         Self{
             x: value.as_ref().coords.x,
             y: value.as_ref().coords.y,
@@ -30,7 +30,7 @@ impl From<nalgebra::UnitQuaternion<f32>> for Quaternion {
     }
 }
 
-impl From<Quaternion> for nalgebra::UnitQuaternion<f32> {
+impl From<Quaternion> for UnitQuaternion<f32> {
     fn from(value: Quaternion) -> Self {
         Self::from_quaternion(nalgebra::Quaternion::new(value.w, value.x, value.y, value.z))
     }
@@ -38,26 +38,26 @@ impl From<Quaternion> for nalgebra::UnitQuaternion<f32> {
 
 impl Quaternion {
     fn add(&self, other: &Self) -> Self {
-        let self_quat: nalgebra::UnitQuaternion<f32> = (*self).into();
-        let other_quat: nalgebra::UnitQuaternion<f32> = (*other).into();
-        nalgebra::UnitQuaternion::<f32>::from_quaternion(self_quat.add(other_quat.as_ref())).into()
+        let self_quat: UnitQuaternion<f32> = (*self).into();
+        let other_quat: UnitQuaternion<f32> = (*other).into();
+        UnitQuaternion::<f32>::from_quaternion(self_quat.add(other_quat.as_ref())).into()
     }
 
     fn multiply(&self, other: &Self) -> Self {
-        let self_quat: nalgebra::UnitQuaternion<f32> = (*self).into();
-        let other_quat: nalgebra::UnitQuaternion<f32> = (*other).into();
+        let self_quat: UnitQuaternion<f32> = (*self).into();
+        let other_quat: UnitQuaternion<f32> = (*other).into();
         let rotation_matrix = self_quat.to_rotation_matrix() * other_quat.to_rotation_matrix();
-        nalgebra::UnitQuaternion::<f32>::from_matrix(rotation_matrix.matrix()).into()
+        UnitQuaternion::<f32>::from_matrix(rotation_matrix.matrix()).into()
     }
 
     pub fn normalize(&self) -> Self {
-        let self_quat: nalgebra::UnitQuaternion<f32> = (*self).into();
-        let quat : nalgebra::UnitQuaternion<f32> = UnitQuaternion::from_quaternion(self_quat.normalize());
+        let self_quat: UnitQuaternion<f32> = (*self).into();
+        let quat : UnitQuaternion<f32> = UnitQuaternion::from_quaternion(self_quat.normalize());
         quat.into()
     }
 
     pub fn euler_angles_rad(&self) -> (f32, f32, f32) {
-        let self_quat: nalgebra::UnitQuaternion<f32> = (*self).into();
+        let self_quat: UnitQuaternion<f32> = (*self).into();
         self_quat.euler_angles()
     }
 
@@ -67,7 +67,7 @@ impl Quaternion {
     }
 
     pub fn rotate(&mut self, x: f32, y: f32, z: f32) {
-        let mut self_quat: nalgebra::UnitQuaternion<f32> = (*self).into();
+        let self_quat: UnitQuaternion<f32> = (*self).into();
         let rotation_euler = UnitQuaternion::from_euler_angles(x, y, z);
         let global_matrix = self_quat * rotation_euler;
         *self = global_matrix.into();
@@ -83,7 +83,7 @@ pub struct Transform { //in glacier this is known as SQV
 
 impl Transform {
     pub fn mul(&self, other: &Transform) -> Self {
-        let mut mat = Matrix43::from(*self).mul(&Matrix43::from(*other));
+        let mat = Matrix43::from(*self).mul(&Matrix43::from(*other));
         mat.into()
     }
 }
@@ -160,7 +160,7 @@ impl From<nalgebra::Matrix4<f32>> for Matrix43 {
 impl From<Transform> for Matrix43 {
     fn from(transform: Transform) -> Self {
             let translation = nalgebra::Translation3::new(transform.position.x, transform.position.y, transform.position.z);
-            let quat: nalgebra::UnitQuaternion<f32> = transform.rotation.into();
+            let quat: UnitQuaternion<f32> = transform.rotation.into();
             let rotation = quat.to_rotation_matrix();
 
             Self{
@@ -176,7 +176,7 @@ impl From<Matrix43> for Transform {
     fn from(value: Matrix43) -> Self {
 
         let quaternion =
-            nalgebra::UnitQuaternion::from_matrix(&nalgebra::Matrix3::new(
+            UnitQuaternion::from_matrix(&nalgebra::Matrix3::new(
                 value.x_axis.x, value.y_axis.x, value.z_axis.x,
                 value.x_axis.y, value.y_axis.y, value.z_axis.y,
                 value.x_axis.z, value.y_axis.z, value.z_axis.z));

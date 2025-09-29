@@ -71,7 +71,7 @@ pub struct BoneRig {
 impl BinWrite for BoneRig {
     type Args<'a> = ();
 
-    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
+    fn write_options<W: Write + Seek>(&self, writer: &mut W, _: Endian, _: Self::Args<'_>) -> BinResult<()> {
         writer.write_le(&0u64)?;
         writer.write_le(&0u64)?;
 
@@ -305,7 +305,7 @@ pub struct PoseBoneInfo{
 impl BinWrite for PoseBoneInfo{
     type Args<'a> = &'a mut u32;
 
-    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
+    fn write_options<W: Write + Seek>(&self, writer: &mut W, _: Endian, args: Self::Args<'_>) -> BinResult<()> {
 
         let pose_bone_array_offset = writer.stream_position()? as u32;
         writer.write_le(&self.pose_bones)?;
@@ -328,7 +328,7 @@ impl BinWrite for PoseBoneInfo{
         align_writer(writer, 16)?;
 
         let names_entry_index_array_offset = writer.stream_position()? as u32;
-        let sizes = self.pose_name_list.iter().enumerate().fold(vec![], |mut acc, (i, name)| {
+        let sizes = self.pose_name_list.iter().enumerate().fold(vec![], |mut acc, (i, _)| {
             if i == 0 { acc.push(0); return acc; }
             let last_size = acc.last().unwrap_or(&0u32);
             let last_name = self.pose_name_list.get(i-1).map(|v|v.len()).unwrap_or(0);
@@ -343,7 +343,7 @@ impl BinWrite for PoseBoneInfo{
         writer.write_le(&self.face_bones)?;
         align_writer(writer, 16)?;
 
-        let header = if self.pose_bones.len() > 0 && self.pose_name_list.len() > 0{ //TODO: add better checking
+        let header = if !self.pose_bones.is_empty() && !self.pose_name_list.is_empty(){ //TODO: add better checking
             PoseBoneHeader {
                 pose_bone_array_offset,
                 pose_bone_index_array_offset,
@@ -438,7 +438,7 @@ impl BoneRig{
 
         let pose_name = self.pose_bone_info.pose_name_list.get(pose_index_loc)?;
         let bones = pose_bone_indices.iter().enumerate().flat_map(|(i, bone_index)| {
-            let bone = self.bone_definitions.get(bone_index.clone() as usize)?;
+            let bone = self.bone_definitions.get(*bone_index as usize)?;
             let pose_bone = pose_bones.get(i)?;
             Some((bone, pose_bone))
         }).collect::<Vec<_>>();
@@ -454,7 +454,7 @@ impl BoneRig{
     }
 
     fn compute_inv_global_matrices(&self) -> Vec<Matrix43> {
-        self.compute_global_matrices().iter().map(|matrix| matrix.inverse()).flatten().collect::<Vec<_>>()
+        self.compute_global_matrices().iter().flat_map(|matrix| matrix.inverse()).collect::<Vec<_>>()
     }
 
     fn compute_global_matrices(&self) -> Vec<Matrix43> {
@@ -470,7 +470,7 @@ impl BoneRig{
             .bone_definitions
             .iter()
             .enumerate()
-            .map(|(i, bone_def)| {
+            .map(|(i, _)| {
                 let transform = &self.bind_pose[i];
 
                 let position = Vector3::new(transform.position.x, -transform.position.z, transform.position.y);

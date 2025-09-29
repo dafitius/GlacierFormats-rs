@@ -143,13 +143,13 @@ impl PrimMesh {
         // Handle optional weights using Either to unify iterator types
         let weights_iter = match weights {
             Some(w) => Either::Left(w.into_iter().map(Some)),
-            None => Either::Right(std::iter::repeat(None).take(len)),
+            None => Either::Right(std::iter::repeat_n(None, len)),
         };
 
         // Similarly handle optional colors
         let colors_iter = match colors {
             Some(c) => Either::Left(c.into_iter().map(Some)),
-            None => Either::Right(std::iter::repeat(None).take(len)),
+            None => Either::Right(std::iter::repeat_n(None, len)),
         };
 
         // Use izip! to iterate over all attributes in parallel
@@ -191,8 +191,7 @@ impl PrimMesh {
             }else {
                 vec![]
             }
-        }else{
-            if let Some(arr) = Self::dequantize_i16_to_f32(&self.sub_mesh.buffers.position, self.pos_scale.as_slice(), self.pos_bias.as_slice()){
+        }else if let Some(arr) = Self::dequantize_i16_to_f32(&self.sub_mesh.buffers.position, self.pos_scale.as_slice(), self.pos_bias.as_slice()){
                 arr.chunks_exact(4).map(|v| {
                     Vector4{
                         x: v[0],
@@ -201,10 +200,11 @@ impl PrimMesh {
                         w: v[3],
                     }
                 }).collect()
-            } else {
-                vec![]
             }
+        else {
+            vec![]
         }
+
     }
 
     pub fn get_weights(&self) -> Option<Vec<VertexWeights>> {
@@ -263,18 +263,18 @@ impl PrimMesh {
 
         let mut maps = vec![];
 
-        if let Some(values) = ntb_data.as_byte_slice().as_slice_of::<i16>().ok() {
+        if let Ok(values) = ntb_data.as_byte_slice().as_slice_of::<i16>() {
             let num_vertices = sub_mesh.num_vertices as usize;
 
             maps = vec![vec![Vector2::default(); num_vertices]; num_uvs as usize];
 
             for (vertex_index, chunk) in values.chunks_exact(ntb_stride).enumerate() {
                 let uv_start = 6;
-                for uv_channel in 0..num_uvs as usize {
-                    let offset: usize = (uv_start + uv_channel * 2) as usize;
+                for (uv_channel, map) in maps.iter_mut().enumerate().take(num_uvs as usize){
+                    let offset: usize = uv_start + uv_channel * 2;
                     let u = (chunk[offset] as f32 * uv_scale_bias.x / MAX) + uv_scale_bias.z;
                     let v = (chunk[offset + 1] as f32 * uv_scale_bias.y / MAX) + uv_scale_bias.w;
-                    maps[uv_channel][vertex_index] = Vector2 { x: u, y: v };
+                    map[vertex_index] = Vector2 { x: u, y: v };
                 }
             }
         }

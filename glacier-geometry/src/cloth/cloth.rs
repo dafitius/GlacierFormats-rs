@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug};
 use binrw::{binrw, BinRead};
 use std::io::{Read, Seek, Write};
 use std::ops::Index;
@@ -62,12 +62,8 @@ pub struct ClothSimPack {
 
     #[br(if(header.properties_size > 0), args{total_size: header.properties_size})]
     pub simulation_properties: Option<SimulationProperties>,
-
-    #[br(temp)]
-    #[br(calc(GRIDPOINT_SIZE))]
-    pub count: usize,
-
-    #[br(count = (header.grid_size as usize / GRIDPOINT_SIZE))]
+    
+    #[br(count = header.grid_size as usize / GRIDPOINT_SIZE)]
     pub grid_points: Vec<GridPoint>,
 
     #[br(count = header.unknown_count as usize)]
@@ -151,7 +147,7 @@ pub struct SimulationProperties
 
     #[br(temp)]
     #[bw(calc = 0)]
-    pad: u8,
+    _pad: u8,
 
     #[br(args{new_format: total_size > 0x74})]
     constrain_properties: ConstrainProperties, //if total size is 148 (0x94), this changes

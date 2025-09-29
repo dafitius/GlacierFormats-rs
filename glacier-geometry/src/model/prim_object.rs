@@ -23,11 +23,11 @@ pub struct PrimObject
 
     #[br(temp)]
     #[bw(calc = bb.min)]
-    pub min: Vector3,
+    pub _min: Vector3,
 
     #[br(temp)]
     #[bw(calc = bb.max)]
-    pub max: Vector3,
+    pub _max: Vector3,
 }
 
 #[allow(dead_code)]

@@ -100,12 +100,16 @@ impl CopyBones {
     pub fn len(&self) -> u32{
         self.indices.len() as u32
     }
+
+    pub fn is_empty(&self) -> bool{
+        self.indices.is_empty()
+    }
 }
 
 impl BinWrite for CopyBones {
     type Args<'a> = (&'a mut u32,);
 
-    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
+    fn write_options<W: Write + Seek>(&self, writer: &mut W, _: Endian, args: Self::Args<'_>) -> BinResult<()> {
         *args.0 = writer.stream_position()? as u32;
 
         self.indices.write_le(writer)?;
@@ -147,7 +151,7 @@ impl BinWrite for BoneIndices {
 pub struct BoneInfo
 {
     #[br(temp)]
-    pub total_size: u16,
+    pub _total_size: u16,
 
     #[br(temp)]
     pub num_accel_entries: u16,
@@ -191,7 +195,7 @@ pub struct BoneAccel
 }
 
 impl PrimMeshWeighted {
-    pub fn get_indices_for_bone(&self, bone_index: usize) -> Option<Vec<u16>>{
+    pub fn get_indices_for_bone(&self, _: usize) -> Option<Vec<u16>>{
 
         // for weights in self.prim_mesh.get_weights() {
         //     for weight in weights{

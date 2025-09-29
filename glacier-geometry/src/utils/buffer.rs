@@ -44,7 +44,7 @@ pub struct VertexBuffers {
 
 pub type IndexBuffer = Vec<u16>;
 
-#[binrw::parser(reader, endian)]
+#[binrw::parser(reader)]
 pub fn parse_vertices(
     num_vertices: u32,
     has_highres: bool,
@@ -108,7 +108,7 @@ pub fn parse_vertices(
 impl BinWrite for VertexBuffers {
     type Args<'a> = ();
 
-    fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
+    fn write_options<W: Write + Seek>(&self, writer: &mut W, _: Endian, _: Self::Args<'_>) -> BinResult<()> {
         // Write the position buffer
         writer.write_all(&self.position)?;
 

@@ -4,26 +4,25 @@ use std::io::Cursor;
 use crate::rig::bone_rig::BoneRig;
 use crate::WoaVersion;
 
-impl Into<rpkg_rs::WoaVersion> for crate::WoaVersion {
-    fn into(self) -> rpkg_rs::WoaVersion {
-        match self{
-            crate::WoaVersion::HM2016 => {rpkg_rs::WoaVersion::HM2016},
-            crate::WoaVersion::HM2 => {rpkg_rs::WoaVersion::HM2}
-            crate::WoaVersion::HM3 => {rpkg_rs::WoaVersion::HM3}
+impl From<crate::WoaVersion> for rpkg_rs::WoaVersion{
+    fn from(value: WoaVersion) -> Self {
+        match value{
+            WoaVersion::HM2016 => Self::HM2016,
+            WoaVersion::HM2 => Self::HM2,
+            WoaVersion::HM3 => Self::HM3
         }
     }
 }
 
-impl Into<crate::WoaVersion> for rpkg_rs::WoaVersion {
-    fn into(self) -> WoaVersion {
-        match self {
-            rpkg_rs::WoaVersion::HM2016 => {crate::WoaVersion::HM2016},
-            rpkg_rs::WoaVersion::HM2 => {crate::WoaVersion::HM2}
-            rpkg_rs::WoaVersion::HM3 => {crate::WoaVersion::HM3}
+impl From<rpkg_rs::WoaVersion> for WoaVersion{
+    fn from(value: rpkg_rs::WoaVersion) -> Self {
+        match value {
+            rpkg_rs::WoaVersion::HM2016 => Self::HM2016,
+            rpkg_rs::WoaVersion::HM2 => Self::HM2,
+            rpkg_rs::WoaVersion::HM3 => Self::HM3,
         }
     }
 }
-
 
 impl GlacierResource for RenderPrimitive {
     type Output = RenderPrimitive;
@@ -37,7 +36,7 @@ impl GlacierResource for RenderPrimitive {
             .map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
-    fn serialize(&self, woa_version: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
+    fn serialize(&self, _: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
         todo!()
     }
 
