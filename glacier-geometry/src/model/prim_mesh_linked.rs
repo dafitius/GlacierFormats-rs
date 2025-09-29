@@ -188,14 +188,26 @@ impl BinWrite for PrimMeshLinked {
 
 
 impl PrimMeshLinked {
-    // pub fn get_indices_for_bone(&self, bone_index: usize) -> Option<Vec<u16>>{
-    //     if self.bone_info.bone_remap.get_ref().get(bone_index)? {
-    //         let entry_index = self.bone_info.bone_remap.get_ref().iter().enumerate().filter(|(i, b)| i <= &bone_index && *b).count();
-    //         let accel_entry = self.bone_info.accel_entries.get(entry_index)?;
-    //         let indices = (0..accel_entry.num_indices as usize).map(|i| self.prim_mesh.sub_mesh.indices.get(accel_entry.offset as usize + i)).flatten().copied().collect::<Vec<_>>();
-    //         Some(indices)
-    //     } else {
-    //         None
-    //     }
-    // }
+
+    pub fn bone_remap(&self) -> Vec<u8> {
+        match &self.bone_info{
+            BoneInfoHolder::Normal(normal) => {normal.bone_remap.clone()},
+            BoneInfoHolder::Compact(compact) => {compact.bone_remap.clone()},
+        }
+    }
+
+    pub fn accel_entries(&self) -> Vec<BoneAccel> {
+        match &self.bone_info{
+            BoneInfoHolder::Normal(normal) => {normal.accel_entries.clone()},
+            BoneInfoHolder::Compact(compact) => {compact.accel_entries.clone()},
+        }
+    }
+
+    pub fn get_indices_for_bone(&self, bone_index: usize) -> Option<Vec<u16>>{
+        let accel_entries = self.accel_entries();
+        let bone_remap = self.bone_remap();
+        let accel_entry = accel_entries.get(*bone_remap.get(bone_index)? as usize)?;
+        let indices = (0..accel_entry.num_indices as usize).map(|i| self.prim_mesh.sub_mesh.indices.get(accel_entry.offset as usize + i)).flatten().copied().collect::<Vec<_>>();
+        Some(indices)
+    }
 }
