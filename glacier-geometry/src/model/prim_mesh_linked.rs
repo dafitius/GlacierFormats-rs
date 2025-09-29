@@ -60,60 +60,49 @@ pub enum BoneInfoHolder{
 
 
 #[binrw::parser(reader)]
-fn parse_bone_remap(total_chunks_align: u32) -> BinResult<BitSet> {
-    let mut bitset = BitSet::with_capacity(total_chunks_align as usize);
-    let u64_count = ((total_chunks_align as f32 + 0.001) / 64.0).ceil() as usize;
+fn parse_bone_remap(total_chunks_align: u32) -> BinResult<Vec<u8>> {
+    let u64_count = (total_chunks_align + 1).div_ceil(64) as usize;
+    let mut bitset = vec![255u8; u64_count * 64];
 
     let values : Vec<u64>= (0..u64_count).flat_map(|_| {
         u64::read_le(reader)
     }).collect::<Vec<_>>();
 
-    for (i, value) in values.iter().rev().enumerate() {
+    let mut idx = 0;
+    let mut bone_idx = 0;
+
+    for value in values.iter() {
         for bit in 0..64 {
             if (value & (1 << bit)) != 0 {
-                bitset.insert(i * 64 + (64 - bit));
+                bitset[idx] = bone_idx;
+                bone_idx += 1;
+            }
+            idx += 1;
+        }
+    }
+    Ok(bitset.into_iter().take((total_chunks_align + 1) as usize).collect())
+}
+
+fn encode_bone_remap_values(bone_remap: Vec<u8>) -> Vec<u64> {
+    let n_bits = bone_remap.len();
+    let u64_count = n_bits.div_ceil(64);
+
+    let mut out = Vec::with_capacity(u64_count);
+    for word in 0..u64_count {
+        let mut value: u64 = 0;
+        for bit in 0..64 {
+            let idx = word * 64 + bit;
+            if idx >= n_bits {
+                break;
+            }
+            if bone_remap.get(idx).copied().unwrap_or(0xFF) != 0xFF {
+                value |= 1u64 << bit;
             }
         }
+        out.push(value);
     }
-    let size = bitset.get_ref().len();
-    Ok(BitSet::from_bit_vec(bitset.into_bit_vec().iter().skip(size - total_chunks_align as usize).collect()))
+    out
 }
-
-
-fn bitset_to_bytes(bitset: &BitSet) -> BinResult<Vec<u8>> {
-    let mut buffer = vec![];
-    let bit_vec = bitset.clone().into_bit_vec();
-    let size = bit_vec.len();
-    let aligned_size = size.div_ceil(64);
-    let mut values = vec![0u64; aligned_size.div_ceil(64)];
-
-    for (i, bit) in bit_vec.iter().enumerate() {
-        if bit {
-            let value_index = i / 64;
-            let bit_index = i % 64;
-            values[value_index] |= 1 << bit_index;
-        }
-    }
-
-    for value in values.iter().rev() {
-        let reversed_value = reverse_u64_bits(*value);
-        buffer.write_all(&reversed_value.to_le_bytes())?;
-    }
-
-    Ok(buffer)
-}
-
-fn reverse_u64_bits(mut value: u64) -> u64 {
-    let mut reversed = 0u64;
-    for _ in 0..64 {
-        reversed <<= 1;
-        reversed |= value & 1;
-        value >>= 1;
-    }
-    reversed
-}
-
-
 
 #[binread]
 #[derive(Debug, PartialEq, Clone)]
@@ -125,15 +114,11 @@ pub struct CompactBoneInfo
     #[br(temp)]
     pub num_blocks: u16,
 
-    // #[br(temp)]
+    #[br(temp)]
     pub total_chunks_align: u32,
 
-    // #[br(parse_with = parse_bone_remap, args(total_chunks_align))]
-    // #[br(dbg)]
-    // pub bone_remap: BitSet,
-
-    #[br(count = (total_chunks_align + 64) / 64)]
-    pub bone_remap: Vec<u64>,
+    #[br(parse_with = parse_bone_remap, args(total_chunks_align))]
+    pub bone_remap: Vec<u8>,
 
     #[br(little, count = num_blocks)]
     pub accel_entries: Vec<BoneAccel>,
@@ -144,20 +129,13 @@ impl BinWrite for CompactBoneInfo {
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: Endian, args: Self::Args<'_>) -> BinResult<()> {
         *args.0 = writer.stream_position()? as u32;
-
-        // let bit_vec = self.bone_remap.clone().into_bit_vec();
-        // let size : u32 = bit_vec.len() as u32;
-        // let aligned_size: u32 = ((size + 63) / 64);
-
-        // let total_size = 0x8 /* header size */ + (aligned_size * size_of::<u64>() as u32) + (self.accel_entries.len() * size_of::<BoneAccel>()) as u32;
-        let total_size = 0x8 /* header size */ + (self.bone_remap.len() * size_of::<u64>()) + (self.accel_entries.len() * size_of::<BoneAccel>());
+         let packed_remap = encode_bone_remap_values(self.bone_remap.clone());
+        let total_size = 0x8 /* header size */ + (packed_remap.len() * 8) + (self.accel_entries.len() * size_of::<BoneAccel>());
 
         (total_size as u16).write_options(writer, endian, ())?;
         (self.accel_entries.len() as u16).write_options(writer, endian, ())?;
-        // size.write_options(writer, endian, ())?;
-        self.total_chunks_align.write_options(writer, endian, ())?;
-        self.bone_remap.write_options(writer, endian, ())?;
-        // bitset_to_bytes(&self.bone_remap)?.write_options(writer, endian, ())?;
+        ((self.bone_remap.len()-1) as u32).write_options(writer, endian, ())?;
+        packed_remap.write_options(writer, endian, ())?;
         for entry in &self.accel_entries {
             entry.write_options(writer, endian, ())?;
         }
@@ -178,7 +156,6 @@ impl BinWrite for PrimMeshLinked {
         let mut copy_bones_ptr: u32 = 0;
         if let Some(copy_bones) = &self.copy_bones{
             CopyBones::write_options(copy_bones, writer, endian, (&mut copy_bones_ptr,))?;
-
         }
 
         let mut coli_bone_ptr: u32 = 0;

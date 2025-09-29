@@ -20,7 +20,7 @@ use crate::WoaVersion;
 pub struct RenderPrimitive {
     #[br(parse_with = FilePtr64::parse)]
     #[br(args{ inner: (woa_version,)})]
-    pub data: PrimObjectHeader,
+    data: PrimObjectHeader,
 }
 
 pub enum LodLevel{
@@ -35,8 +35,8 @@ pub enum LodLevel{
 }
 
 impl RenderPrimitive {
-    pub fn parse(path: &Path, woa_version: WoaVersion) -> BinResult<RenderPrimitive> {
-        let mut reader = Cursor::new(fs::read(path).unwrap());
+    pub fn parse<P: AsRef<Path>>(path: P, woa_version: WoaVersion) -> BinResult<RenderPrimitive> {
+        let mut reader = Cursor::new(fs::read(path)?);
         let prim: RenderPrimitive = reader.read_le_args((woa_version,))?;
         Ok(prim)
     }

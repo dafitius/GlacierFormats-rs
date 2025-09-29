@@ -27,7 +27,7 @@ use crate::utils::math::Vector3;
 
 
 #[binread]
-#[derive(BinWrite, Debug, PartialEq, Clone)]
+#[derive(BinWrite, PartialEq, Clone)]
 #[br(import{
 cloth_id: u8,
 num_vertices: u32})]
@@ -43,6 +43,16 @@ pub enum ClothSimMesh {
     ),
 }
 
+impl Debug for ClothSimMesh {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ClothSimMesh::Simulation(sim) => {write!(f, "{:?}", sim)?}
+            ClothSimMesh::Skinned(skin) => {write!(f, "Cloth skinning with {:?} entries", skin.len())?}
+        }
+        Ok(())
+    }
+}
+
 #[derive(BinRead, BinWrite, Debug, PartialEq, Clone)]
 pub struct ClothSkinning
 {
@@ -54,7 +64,7 @@ pub struct ClothSkinning
 
 
 #[binread]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct ClothSimPack {
     #[br(temp)]
     pub header: PackHeader,
@@ -67,6 +77,12 @@ pub struct ClothSimPack {
 
     #[br(count = header.unknown_count as usize)]
     pub unknown: Vec<UnkStruct>,
+}
+
+impl Debug for ClothSimPack {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "ClothSimPack: sim: {:?}, unknown: {:?}", self.simulation_properties, self.unknown)
+    }
 }
 
 #[binrw]
@@ -121,7 +137,6 @@ pub struct PackHeader
 #[br(import{total_size: u16})]
 pub struct SimulationProperties
 {
-    // #[br(dbg)]
     root_bone: u32,
     frequency: f32,
     collision_offset: f32,

@@ -146,8 +146,9 @@ impl BinWrite for PrimSubMesh {
         *args.3 = writer.stream_position()? as u32;
 
         writer.write_type(&header_offset, endian)?;
-        writer.write_type(&0u32, endian)?; //todo: change this to use align_writer
-        writer.write_type(&0u64, endian)?;
+        align_writer(writer, 16)?;
+        // writer.write_type(&0u32, endian)?; //todo: change this to use align_writer
+        // writer.write_type(&0u64, endian)?;
 
         Ok(())
     }
