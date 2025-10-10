@@ -319,7 +319,7 @@ impl TextureMapBuilder {
 
     #[cfg(feature = "unstable")]
     pub fn with_texd_id(mut self, texd_id: u32) -> Self {
-        self.params.set_texd_id(texd_id);
+        self.params.set_texd_identifier(texd_id);
         self
     }
 
