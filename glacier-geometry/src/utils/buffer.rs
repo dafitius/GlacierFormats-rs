@@ -27,12 +27,7 @@ pub struct Vertex {
     pub color: Option<Color>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct VertexWeights
-{
-    pub weight: [f32; 6],
-    pub indices: [u8; 6],
-}
+pub type VertexWeights = Vec<(u8, f32)>;
 
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct VertexBuffers {

@@ -248,17 +248,17 @@ impl PrimMeshLinked {
         }
     }
 
-    pub fn indices_for_bone(&self, bone_index: usize) -> Option<&[u16]> {
-        let bone_map = self.bone_remap();
-        let accel_idx = bone_map.get(bone_index)?;
-        let accel_idx = (*accel_idx)?;
-
-        let entry = self.accel_entries().get(accel_idx)?;
-
-        let start = entry.offset as usize;
-        let len = entry.num_indices as usize;
-        let end = start.checked_add(len)?;
-
-        self.prim_mesh.sub_mesh.indices.get(start..end)
-    }
+    // pub fn indices_for_bone(&self, bone_index: usize) -> Option<&[u16]> {
+    //     let bone_map = self.bone_remap();
+    //     let accel_idx = bone_map.get(bone_index)?;
+    //     let accel_idx = (*accel_idx)?;
+    // 
+    //     let entry = self.accel_entries().get(accel_idx)?;
+    // 
+    //     let start = entry.offset as usize;
+    //     let len = entry.num_indices as usize;
+    //     let end = start.checked_add(len)?;
+    // 
+    //     self.prim_mesh.sub_mesh.indices.get(start..end)
+    // }
 }

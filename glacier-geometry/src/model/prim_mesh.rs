@@ -7,8 +7,10 @@ use crate::utils::math::{BoundingBox, Color, Vector2, Vector3, Vector4};
 use crate::WoaVersion;
 use binrw::{binread, BinResult, BinWrite, BinWriterExt, Endian, FilePtr32};
 use byte_slice_cast::{AsByteSlice, AsSliceOf};
-use itertools::{izip, Either};
+use itertools::{izip, Either, Itertools};
 use std::io::{Seek, SeekFrom, Write};
+use std::iter::zip;
+use num_traits::Zero;
 use wide::f32x4;
 
 #[binread]
@@ -157,6 +159,10 @@ impl PrimMesh {
         &self.sub_mesh.indices
     }
 
+    pub fn get_triangles(&self) -> Vec<&[u16; 3]> {
+        self.sub_mesh.indices.chunks(3).flat_map(|chunk: &[u16]| chunk.try_into()).collect_vec()
+    }
+
     pub fn get_vertices(&self) -> Vec<Vertex> {
         let positions = self.get_positions();
         let normals = self.get_normals();
@@ -267,13 +273,8 @@ impl PrimMesh {
                         chunk[8] as f32 * FACTOR,
                         chunk[9] as f32 * FACTOR,
                     ];
-
                     let joint = [chunk[4], chunk[5], chunk[6], chunk[7], chunk[10], chunk[11]];
-
-                    VertexWeights {
-                        weight,
-                        indices: joint,
-                    }
+                    zip(joint, weight).filter(|(idx, weight)| !weight.is_zero() && !idx.is_zero()).collect()
                 })
                 .collect(),
         )
