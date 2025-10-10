@@ -1,6 +1,6 @@
 [package]
 name = "glacier-texture"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2021"
 license = "Apache-2.0"
 categories = ["game-development", "data-structures", "parser-implementations"]
