@@ -6,8 +6,9 @@ use directxtex::{
     TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS,
 };
 use png::ColorType;
-use std::io;
+use std::{io, slice};
 use std::io::{BufWriter, Cursor, Write};
+use std::ptr::NonNull;
 use thiserror::Error;
 
 #[cfg(feature = "image")]
@@ -193,6 +194,7 @@ pub(crate) fn decompress_dds(
         .map_err(DirectXTexError)?
     }
 
+    //TODO: remove this?
     if tex.format() == RenderFormat::R16G16B16A16 {
         scratch_image = directxtex::convert(
             scratch_image.images(),
@@ -225,6 +227,15 @@ pub(crate) fn decompress_dds(
         }
     }
     Ok(scratch_image)
+}
+
+pub(crate) fn image_pixels(image: &Image) -> Option<Vec<u8>> {
+    let pixels = NonNull::new(image.pixels)?;
+    let scanlines = image.format.compute_scanlines(image.height);
+    let buffer_size = image.row_pitch.checked_mul(scanlines)?;
+    let raw_slice = unsafe { slice::from_raw_parts(pixels.as_ptr(), buffer_size) };
+    let raw_buffer = raw_slice.to_vec();
+    Some(raw_buffer)
 }
 
 pub fn create_mip_dds(

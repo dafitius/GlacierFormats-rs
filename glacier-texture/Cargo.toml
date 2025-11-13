@@ -24,6 +24,7 @@ image = { version = "0.25.8" , default-features = false, optional = true }
 
 [dev-dependencies]
 clap = { version = "4.5.23", features = ["derive"] }
+image = { version = "0.25.8", features = ["exr"] }
 anyhow = "1.0.99"
 
 [features]

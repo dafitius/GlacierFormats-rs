@@ -11,6 +11,7 @@ pub mod mipblock;
 pub mod atlas;
 #[cfg(feature = "image")]
 pub mod image;
+pub mod box_reflection;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum WoaVersion {
