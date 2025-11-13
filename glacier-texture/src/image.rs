@@ -7,11 +7,12 @@ use crate::pack::{TextureMapBuilder, TextureMapParameters, TexturePackerError};
 use crate::texture_map::{TextureMap};
 use crate::WoaVersion;
 use binrw::BinRead;
-use directxtex::{HResultError, ScratchImage, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, TEX_FILTER_FLAGS};
+use directxtex::{HResultError, ScratchImage, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT};
 use image::error::{EncodingError, ImageFormatHint};
 use image::{ColorType, ExtendedColorType, ImageDecoder, ImageEncoder, ImageError, ImageResult};
 use std::io::{BufRead, Seek, Write};
 use thiserror::Error;
+use crate::box_reflection::{BoxReflection, CubemapLayout};
 
 #[derive(Debug, Error)]
 pub enum TextureMapEncodeError {
@@ -207,6 +208,58 @@ impl ImageDecoder for TextureMapDecoder {
 
         let data = blob.buffer();
         buf.copy_from_slice(&data[data.len() - buf.len()..]);
+
+        Ok(())
+    }
+
+    fn read_image_boxed(self: Box<Self>, buf: &mut [u8]) -> ImageResult<()> {
+        (*self).read_image(buf)
+    }
+}
+
+pub struct BoxReflectionDecoder {
+    texture: BoxReflection,
+}
+
+impl BoxReflectionDecoder {
+
+    pub fn from_box_reflection(texture: BoxReflection) -> Self {
+        Self { texture }
+    }
+}
+
+impl ImageDecoder for BoxReflectionDecoder {
+    fn dimensions(&self) -> (u32, u32) {
+        (BoxReflection::width() as u32, BoxReflection::height() as u32)
+    }
+
+    fn color_type(&self) -> ColorType {
+        ColorType::Rgba32F
+    }
+
+    fn read_image(mut self, buf: &mut [u8]) -> ImageResult<()>
+    where
+        Self: Sized,
+    {
+        let dds = self.texture.create_dds(Some(CubemapLayout::HorizontalCross)).unwrap();
+        let mut scratch_image = ScratchImage::load_dds(
+            dds.as_slice(),
+            DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT,
+            None,
+            None,
+        ).map_err(DirectXTexError)
+            .unwrap();
+
+        scratch_image = scratch_image
+            .convert(DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT)
+            .unwrap();
+
+        let image = scratch_image
+            .image(0, 0, 0)
+            .unwrap();
+        // let raw_slice = unsafe { slice::from_raw_parts(image.pixels, image.width*image.height*16) };
+        let buffer = crate::convert::image_pixels(image).unwrap_or_default();
+        buf.copy_from_slice(buffer.as_slice());
 
         Ok(())
     }
