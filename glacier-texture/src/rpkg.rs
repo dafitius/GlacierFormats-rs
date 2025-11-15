@@ -1,6 +1,7 @@
 use std::io::Cursor;
 use binrw::{BinRead, BinWrite};
 use rpkg_rs::{GlacierResource, GlacierResourceError};
+use crate::box_reflection::{BoxReflectionCollection};
 use crate::mipblock::MipblockData;
 use crate::pack::TexturePackerError;
 use crate::texture_map::TextureMap;
@@ -117,4 +118,36 @@ pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionMan
         texture_map.set_mipblock1(mipblock);
     }
     Ok(texture_map)
+}
+
+impl GlacierResource for BoxReflectionCollection{
+    type Output = BoxReflectionCollection;
+
+    fn process_data<R: AsRef<[u8]>>(_: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
+        BoxReflectionCollection::from_memory(data.as_ref()).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
+    }
+
+    fn serialize(&self, _: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
+        self.pack_to_vec().map_err(|e|GlacierResourceError::WriteError(format!("Boxc packing error: {e}")))
+    }
+
+    fn resource_type() -> [u8; 4] {
+        *b"BOXC"
+    }
+
+    fn video_memory_requirement(&self) -> u64 {
+        self.entries.iter().map(|e|e.buffer.len() as u64).sum()
+    }
+
+    fn system_memory_requirement(&self) -> u64 {
+        0xffffffff
+    }
+
+    fn should_scramble(&self) -> bool {
+        true
+    }
+
+    fn should_compress(&self) -> bool {
+        true
+    }
 }

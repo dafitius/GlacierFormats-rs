@@ -199,7 +199,7 @@ impl TextureMapBuilder {
 
     #[cfg(feature = "image")]
     pub fn from_dynamic_image(image: DynamicImage) -> Result<Self, TexturePackerError> {
-        let scratch_image = crate::image::dynamic_image_to_scratch_image(
+        let scratch_image = crate::image::helpers::dynamic_image_to_scratch_image(
             image.as_bytes(),
             image.width(),
             image.height(),
