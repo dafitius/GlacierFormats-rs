@@ -23,6 +23,10 @@ rpkg-rs = { path = "/home/dafitius/Documents/GitHub/rpkg-rs", features = ["path-
 png = "0.18.0"
 image = { version = "0.25.8" , default-features = false, optional = true }
 
+[dependencies.glacier-base]
+path = "../glacier-base"
+features = ["binrw"]
+
 [dev-dependencies]
 clap = { version = "4.5.23", features = ["derive"] }
 image = { version = "0.25.8", features = ["exr"] }
