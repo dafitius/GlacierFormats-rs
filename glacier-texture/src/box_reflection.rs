@@ -10,6 +10,7 @@ use crate::image::helpers;
 
 #[cfg(feature = "image")]
 use image::{ColorType, DynamicImage, ExtendedColorType};
+use glacier_base::math::Vector3;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoxReflectionError {
@@ -60,7 +61,7 @@ impl BoxReflectionCollection {
         self.entries.get_mut(index)
     }
 
-    fn nearest_by<I, T>(iter: I, x: f32, y: f32, z: f32) -> Option<I::Item>
+    fn nearest_by<I, T>(iter: I, position: Vector3) -> Option<I::Item>
     where
         I: Iterator<Item = T>,
         T: Borrow<BoxReflection>,
@@ -69,33 +70,33 @@ impl BoxReflectionCollection {
             let a_ref = a.borrow();
             let b_ref = b.borrow();
 
-            let dx_a = a_ref.x() - x;
-            let dy_a = a_ref.y() - y;
-            let dz_a = a_ref.z() - z;
+            let dx_a = a_ref.x() - position.x;
+            let dy_a = a_ref.y() - position.y;
+            let dz_a = a_ref.z() - position.z;
             let da = dx_a * dx_a + dy_a * dy_a + dz_a * dz_a;
 
-            let dx_b = b_ref.x() - x;
-            let dy_b = b_ref.y() - y;
-            let dz_b = b_ref.z() - z;
+            let dx_b = b_ref.x() - position.x;
+            let dy_b = b_ref.y() - position.y;
+            let dz_b = b_ref.z() - position.z;
             let db = dx_b * dx_b + dy_b * dy_b + dz_b * dz_b;
 
             da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         })
     }
 
-    pub fn box_reflection_at(&self, x: f32, y: f32, z: f32) -> Option<&BoxReflection> {
-        Self::nearest_by(self.entries.iter(), x, y, z)
+    pub fn box_reflection_at(&self, position: Vector3) -> Option<&BoxReflection> {
+        Self::nearest_by(self.entries.iter(), position)
     }
 
-    pub fn box_reflection_at_mut(&mut self, x: f32, y: f32, z: f32) -> Option<&mut BoxReflection> {
-        Self::nearest_by(self.entries.iter_mut(), x, y, z)
+    pub fn box_reflection_at_mut(&mut self, position: Vector3) -> Option<&mut BoxReflection> {
+        Self::nearest_by(self.entries.iter_mut(), position)
     }
 }
 
 #[binrw]
 #[derive(Default, Clone, Debug)]
 pub struct BoxReflection {
-    pos: [f32; 3],
+    pos: Vector3,
     #[br(temp)]
     #[bw(calc(buffer.len() as u32))]
     size: u32,
@@ -154,9 +155,9 @@ impl CubemapLayout{
 }
 
 impl BoxReflection {
-    pub fn x(&self) -> f32 { self.pos[2] }
-    pub fn y(&self) -> f32 { self.pos[1] }
-    pub fn z(&self) -> f32 { self.pos[0] }
+    pub fn x(&self) -> f32 { self.pos.z }
+    pub fn y(&self) -> f32 { self.pos.y }
+    pub fn z(&self) -> f32 { self.pos.x }
 
     pub fn tile_width() -> usize {
         128
@@ -170,7 +171,7 @@ impl BoxReflection {
     }
 
     #[cfg(feature = "image")]
-    pub fn from_dynamic_image(image: &DynamicImage, pos: [f32; 3]) -> Result<Self, BoxReflectionError> {
+    pub fn from_dynamic_image(image: &DynamicImage, pos: Vector3) -> Result<Self, BoxReflectionError> {
         let extended_color = match &image.color(){
             ColorType::L8 => ExtendedColorType::L8,
             ColorType::La8 => ExtendedColorType::La8,
@@ -189,12 +190,12 @@ impl BoxReflection {
         Self::from_scratch_image(scratch_image, pos)
     }
 
-    pub fn from_dds(data: Vec<u8>, pos: [f32; 3]) -> Result<BoxReflection, BoxReflectionError>{
+    pub fn from_dds(data: Vec<u8>, pos: Vector3) -> Result<BoxReflection, BoxReflectionError>{
         let dds = ScratchImage::load_dds(&data, DDS_FLAGS_NONE, None, None)?;
         Self::from_scratch_image(dds, pos)
     }
 
-    pub fn from_scratch_image(scratch_image: ScratchImage, pos: [f32; 3]) -> Result<BoxReflection, BoxReflectionError> {
+    pub fn from_scratch_image(scratch_image: ScratchImage, pos: Vector3) -> Result<BoxReflection, BoxReflectionError> {
 
         let (w, h) = (scratch_image.metadata().width, scratch_image.metadata().height);
 
@@ -355,7 +356,7 @@ impl IndexMut<usize> for BoxReflectionCollection {
 
 impl<'a> IntoIterator for &'a BoxReflectionCollection {
     type Item = &'a BoxReflection;
-    type IntoIter = std::slice::Iter<'a, BoxReflection>;
+    type IntoIter = slice::Iter<'a, BoxReflection>;
     fn into_iter(self) -> Self::IntoIter {
         self.entries.iter()
     }
@@ -363,35 +364,92 @@ impl<'a> IntoIterator for &'a BoxReflectionCollection {
 
 impl<'a> IntoIterator for &'a mut BoxReflectionCollection {
     type Item = &'a mut BoxReflection;
-    type IntoIter = std::slice::IterMut<'a, BoxReflection>;
+    type IntoIter = slice::IterMut<'a, BoxReflection>;
     fn into_iter(self) -> Self::IntoIter {
         self.entries.iter_mut()
     }
 }
 
 pub mod cubemap_utils {
-    use std::ptr::NonNull;
-    use std::{slice};
+    use bitfield_struct::bitfield;
     use directxtex::{Rect, ScratchImage, CP_FLAGS_NONE, DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_FILTER_DEFAULT, TEX_FILTER_FLAGS};
+    use crate::box_reflection::cubemap_utils::Rotate::{Rotate180, Rotate270, Rotate90};
     use super::{Image, CubemapLayout, BoxReflectionError, BoxReflection};
 
-    fn rotate180(image: &Image) -> Result<(), BoxReflectionError> {
-        let pixels_ptr = NonNull::new(image.pixels).unwrap();
-        let scanlines = image.format.compute_scanlines(image.height);
-        let len = image.row_pitch.checked_mul(scanlines).unwrap();
-        let pixels = unsafe { slice::from_raw_parts_mut(pixels_ptr.as_ptr(), len) };
 
-        let pixel_stride: usize = image.format.bits_per_pixel() / 8;
-        let mut left = 0usize;
-        let mut right = len - pixel_stride;
-        while left < right {
-            for k in 0..pixel_stride {
-                pixels.swap(left + k, right + k);
+    #[derive(Copy, Clone, Debug)]
+    pub enum Rotate{
+        Rotate90,
+        Rotate180,
+        Rotate270,
+    }
+
+    impl Rotate {
+        pub fn degrees(&self) -> usize {
+            match self {
+                Rotate90 => {90}
+                Rotate180 => {180}
+                Rotate270 => {270}
             }
-            left += pixel_stride;
-            right = right.saturating_sub(pixel_stride);
         }
-        Ok(())
+    }
+
+    #[bitfield(u8)]
+    pub struct Flip {
+        horizontal: bool,
+        vertical: bool,
+        #[bits(6)]
+        _rem: u8,
+    }
+
+    pub fn rotate_image(image: &Image, rotate: Option<Rotate>) {
+        use std::{ptr, slice};
+
+        let pixel_stride = image.format.bits_per_pixel() / 8;
+        let w = image.width;
+        let h = image.height;
+        let src_row_pitch = image.row_pitch;
+
+        let dst_row_pitch = w * pixel_stride;
+        let dst_len = dst_row_pitch * h;
+
+        let src_ptr = image.pixels;
+        let src_slice = unsafe { slice::from_raw_parts(src_ptr as *const u8, src_row_pitch * h) };
+
+        let mut dst = vec![0u8; dst_len];
+        let dst_ptr = dst.as_mut_ptr();
+
+        let rot = rotate.map(|r| r.degrees()).unwrap_or(0);
+
+        let map = |x: usize, y: usize| -> (usize, usize) {
+            match rot {
+                0 => (x, y),
+                90 => (h - 1 - y, x),
+                180 => (w - 1 - x, h - 1 - y),
+                270 => (y, w - 1 - x),
+                _ => (x, y),
+            }
+        };
+
+        for y in 0..h {
+            let src_row_off = y * src_row_pitch;
+            for x in 0..w {
+                let src_off = src_row_off + x * pixel_stride;
+                let (nx, ny) = map(x, y);
+                let dst_off = ny * dst_row_pitch + nx * pixel_stride;
+                unsafe {
+                    ptr::copy_nonoverlapping(
+                        src_slice.as_ptr().add(src_off),
+                        dst_ptr.add(dst_off),
+                        pixel_stride,
+                    );
+                }
+            }
+        }
+
+        unsafe {
+            ptr::copy_nonoverlapping(dst_ptr, src_ptr, dst_len);
+        }
     }
 
     pub fn compose_layout(images: &ScratchImage, layout: CubemapLayout) -> Result<ScratchImage, BoxReflectionError> {
@@ -418,14 +476,20 @@ pub mod cubemap_utils {
             pixels: out.as_mut_ptr(),
         };
 
-        for (face_index,(tile_x, tile_y)) in face_tile_positions.iter().enumerate() {
+        for face_index in 0..6 {
             let face_image = images.image(0, face_index, 0)
                 .ok_or(BoxReflectionError::Other("Failed to find cubemap image".into()))?;
-            if matches!(layout, CubemapLayout::VerticalCross) && face_index == 5 {
-                rotate180(face_image)?
+            if let (Some(new_face_idx), rotation) =  map_face_and_image_rotation(Axis::Z, Rotate90, face_index){
+                rotate_image(face_image, rotation);
+                let (tile_x, tile_y) = face_tile_positions[new_face_idx];
+
+                if matches!(layout, CubemapLayout::VerticalCross) && new_face_idx == 5 {
+                    rotate_image(face_image, Some(Rotate180));
+                }
+
+                let rect = Rect { x: 0, y: 0, w: face_w, h: face_h, };
+                image.copy_rectangle(face_image, &rect, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, tile_x * face_w, tile_y * face_h)?;
             }
-            let rect = Rect { x: 0, y: 0, w: face_w, h: face_h, };
-            image.copy_rectangle(face_image, &rect, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, tile_x * face_w, tile_y * face_h)?;
         }
         let mut scratch_image = ScratchImage::default();
         scratch_image.initialize_from_image(&image, false, CP_FLAGS_NONE)?;
@@ -473,15 +537,80 @@ pub mod cubemap_utils {
             face_image.copy_rectangle(image, &rect, TEX_FILTER_DEFAULT, 0, 0)?;
 
             if matches!(layout, CubemapLayout::VerticalCross) && face_index == 5 {
-                rotate180(&face_image)?;
+                rotate_image(&face_image, Some(Rotate180));
             }
             faces_vec.push((out, face_image));
         }
-
         let (buffers, faces_array): (Vec<Vec<u8>>, Vec<Image>) = faces_vec.into_iter().unzip();
         let _buffers = buffers; // keeps allocations alive until end of scope TODO: Remove this hack
+
         let mut scratch_image = ScratchImage::default();
         scratch_image.initialize_cube_from_images(faces_array.as_slice(), CP_FLAGS_NONE)?;
         Ok(scratch_image)
+    }
+
+    #[derive(Copy, Clone, Debug)]
+    enum Axis { X, Y, Z }
+    type Vec3 = (i8, i8, i8);
+
+    fn rotate_vec(axis: Axis, rot: Rotate, (x,y,z): Vec3) -> Vec3 {
+        match axis {
+            Axis::X => match rot { //was y
+                Rotate270  => ( z,  y, -x),
+                Rotate180 => (-x,  y, -z),
+                Rotate90 => (-z,  y,  x),
+            },
+            Axis::Y => match rot { //was z
+                Rotate270  => (-y,  x,  z),
+                Rotate180 => (-x, -y,  z),
+                Rotate90 => ( y, -x,  z),
+            },
+            Axis::Z => match rot { //was x
+                Rotate270  => ( x, -z,  y),
+                Rotate180 => ( x, -y, -z),
+                Rotate90 => ( x,  z, -y),
+            },
+        }
+    }
+
+    fn face_axes(face: usize) -> Option<(Vec3, Vec3, Vec3)> {
+        match face {
+            0 => Some((( 1,  0,  0),  (0,  0, -1),  (0, -1,  0))), // +X
+            1 => Some(((-1,  0,  0),  (0,  0,  1),  (0, -1,  0))), // -X
+            2 => Some((( 0,  1,  0),  (1,  0,  0),  (0,  0,  1))), // +Y
+            3 => Some((( 0, -1,  0),  (1,  0,  0),  (0,  0, -1))), // -Y
+            4 => Some((( 0,  0,  1),  (1,  0,  0),  (0, -1,  0))), // +Z
+            5 => Some((( 0,  0, -1),  (-1, 0,  0),  (0, -1,  0))), // -Z
+            _ => None,
+        }
+    }
+    fn neg(v: Vec3) -> Vec3 { (-v.0, -v.1, -v.2) }
+
+    fn map_face_and_image_rotation(axis: Axis, rot: Rotate, face_index: usize) -> (Option<usize>, Option<Rotate>) {
+        let (n_src, r_src, _) = face_axes(face_index).unwrap();
+        let n_rot = rotate_vec(axis, rot, n_src);
+        let r_rot = rotate_vec(axis, rot, r_src);
+
+        let dst = match n_rot {
+            ( 1,  0,  0) => Some(0),
+            (-1,  0,  0) => Some(1),
+            ( 0,  1,  0) => Some(2),
+            ( 0, -1,  0) => Some(3),
+            ( 0,  0,  1) => Some(4),
+            ( 0,  0, -1) => Some(5),
+            _ => None,
+        };
+
+        let (_, r_dst, u_dst) = face_axes(dst.unwrap()).unwrap();
+
+        let rot = match r_rot{
+            v if v == r_dst => None,
+            v if v == neg(r_dst) => Some(Rotate180),
+            v if v == u_dst => Some(Rotate90),
+            v if v == neg(u_dst) => Some(Rotate270),
+            _ => unreachable!(),
+        };
+
+        (dst, rot)
     }
 }
