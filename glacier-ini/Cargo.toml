@@ -12,6 +12,8 @@ repository = "https://github.com/dafitius/glacierformats-rs"
 status = "actively-developed"
 
 [dependencies]
+glacier-base = {path = "../glacier-base"}
+
 thiserror = "2.0.12"
 indexmap = "2.10.0"
 itertools = "0.14.0"

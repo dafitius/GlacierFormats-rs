@@ -1,0 +1,19 @@
+[package]
+name = "glacier-base"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nalgebra = "0.34.1"
+binrw = { version = "0.15.0", optional = true}
+bincode = { version = "2.0.1", optional = true}
+
+thiserror = "2.0.12"
+byteorder = "1.5.0"
+extended-tea = "0.1.1"
+crc32fast = "1.4.2"
+
+[features]
+default = []
+binrw = ["dep:binrw"]
+bincode = ["dep:bincode"]
