@@ -295,7 +295,7 @@ pub(crate) mod helpers {
     }
 
     pub(super) fn rgb32f_to_rgba32f(rgb: &[u8]) -> Vec<u8> {
-        assert_eq!(rgb.len() % 6, 0, "Input length must be divisible by 6.");
+        assert_eq!(rgb.len() % 12, 0, "Input length must be divisible by 12.");
         let mut rgba = Vec::with_capacity(rgb.len() / 3 * 4);
         for chunk in rgb.chunks(12) {
             rgba.extend_from_slice(&chunk[0..4]);

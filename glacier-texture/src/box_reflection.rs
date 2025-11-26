@@ -4,7 +4,7 @@ use std::io::{BufWriter, Cursor, Seek, Write};
 use std::ops::{Index, IndexMut};
 use std::path::Path;
 use binrw::{binrw, BinRead, BinWriterExt};
-use directxtex::{HResultError, Image, ScratchImage, CP_FLAGS, CP_FLAGS_NONE, DDS_FLAGS, DDS_FLAGS_NONE, DXGI_FORMAT_BC6H_SF16, DXGI_FORMAT_BC6H_UF16, DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_COMPRESS_DEFAULT, TEX_THRESHOLD_DEFAULT};
+use directxtex::{HResultError, Image, ScratchImage, CP_FLAGS, CP_FLAGS_NONE, DDS_FLAGS, DDS_FLAGS_NONE, DXGI_FORMAT_BC6H_UF16, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_UNORM, TEX_COMPRESS_DEFAULT, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT};
 use crate::convert;
 use crate::image::helpers;
 
@@ -93,6 +93,8 @@ impl BoxReflectionCollection {
     }
 }
 
+
+
 #[binrw]
 #[derive(Default, Clone, Debug)]
 pub struct BoxReflection {
@@ -155,19 +157,17 @@ impl CubemapLayout{
 }
 
 impl BoxReflection {
+    #[allow(clippy::misnamed_getters)]
     pub fn x(&self) -> f32 { self.pos.z }
     pub fn y(&self) -> f32 { self.pos.y }
+    #[allow(clippy::misnamed_getters)]
     pub fn z(&self) -> f32 { self.pos.x }
 
-    pub fn tile_width() -> usize {
+    pub const fn tile_width() -> usize {
         128
     }
-    pub fn tile_height() -> usize {
+    pub const fn tile_height() -> usize {
         128
-    }
-
-    pub fn width(layout: CubemapLayout) -> usize {
-        layout.tile_counts().0
     }
 
     #[cfg(feature = "image")]
@@ -205,11 +205,13 @@ impl BoxReflection {
         let layout = CubemapLayout::from_tile_counts(cols, rows);
 
         if let Some(layout) = layout {
+            let scratch_image = scratch_image.convert(DXGI_FORMAT_R16G16B16A16_UNORM, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
             let scratch = cubemap_utils::decompose_layout(scratch_image.image(0,0,0).unwrap(), layout)?;
-            let image = cubemap_utils::compose_layout(&scratch, CubemapLayout::HorizontalStrip)?;
-            let compressed = image.compress(DXGI_FORMAT_BC6H_SF16, TEX_COMPRESS_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
+            let image = cubemap_utils::compose_layout(&scratch, CubemapLayout::VerticalStrip)?;
+            let compressed = image.compress(DXGI_FORMAT_BC6H_UF16, TEX_COMPRESS_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
             let image = compressed.image(0,0,0).unwrap();
             let buffer = convert::image_pixels(image).unwrap_or_default();
+
             Ok(Self { pos, buffer })
         } else {
             Err(BoxReflectionError::Other(
@@ -367,6 +369,27 @@ impl<'a> IntoIterator for &'a mut BoxReflectionCollection {
     type IntoIter = slice::IterMut<'a, BoxReflection>;
     fn into_iter(self) -> Self::IntoIter {
         self.entries.iter_mut()
+    }
+}
+
+impl<'a> FromIterator<&'a BoxReflection> for BoxReflectionCollection
+where
+    BoxReflection: Clone,
+{
+    fn from_iter<T: IntoIterator<Item = &'a BoxReflection>>(iter: T) -> Self {
+        let entries = iter
+            .into_iter()
+            .map(|b| (*b).clone()) // clone the owned BoxReflection, not the reference
+            .collect::<Vec<BoxReflection>>();
+        Self { entries }
+    }
+}
+
+impl FromIterator<BoxReflection> for BoxReflectionCollection {
+    fn from_iter<T: IntoIterator<Item = BoxReflection>>(iter: T) -> Self {
+        Self {
+            entries: iter.into_iter().collect(),
+        }
     }
 }
 
@@ -542,14 +565,29 @@ pub mod cubemap_utils {
             faces_vec.push((out, face_image));
         }
         let (buffers, faces_array): (Vec<Vec<u8>>, Vec<Image>) = faces_vec.into_iter().unzip();
+
+        let mut faces_opt: Vec<Option<Image>> = (0..faces_array.len()).map(|_| None).collect();
+        for (face_index, image) in faces_array.into_iter().enumerate() {
+            if let (Some(new_face_idx), rotation) = map_face_and_image_rotation(Axis::Z, Rotate180, face_index)
+            {
+                rotate_image(&image, rotation);
+                faces_opt[new_face_idx] = Some(image);
+            }
+        }
+
+        let faces: Vec<Image> = faces_opt
+            .into_iter()
+            .map(|opt| opt.expect("expected every face to be assigned"))
+            .collect();
         let _buffers = buffers; // keeps allocations alive until end of scope TODO: Remove this hack
 
         let mut scratch_image = ScratchImage::default();
-        scratch_image.initialize_cube_from_images(faces_array.as_slice(), CP_FLAGS_NONE)?;
+        scratch_image.initialize_cube_from_images(faces.as_slice(), CP_FLAGS_NONE)?;
         Ok(scratch_image)
     }
 
     #[derive(Copy, Clone, Debug)]
+    #[allow(dead_code)] //TODO: add API to set custom rotations
     enum Axis { X, Y, Z }
     type Vec3 = (i8, i8, i8);
 
