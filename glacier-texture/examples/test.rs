@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
+use image::ImageFormat;
 use rpkg_rs::resource::package_builder::{PackageBuilder, PackageResourceBuilder};
 use rpkg_rs::resource::pdefs::PartitionId;
 use rpkg_rs::resource::resource_package::{PackageVersion, ReferenceType, ResourceReferenceFlags, ResourceReferenceFlagsStandard};
@@ -12,8 +13,8 @@ use glacier_texture::WoaVersion;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Parameters
-    let r8_path = PathBuf::from("D:\\David\\Hitman-modding\\temp\\0018941C98370007.TEXT");
-    let r16_path = PathBuf::from("D:\\David\\Hitman-modding\\temp\\000B1BC3C75B15D9.TEXT");
+    // let r8_path = PathBuf::from("D:\\David\\Hitman-modding\\temp\\0018941C98370007.TEXT");
+    let r16_path = PathBuf::from("/media/dafitius/980 PRO/HitmanProjects/tmp/000B1BC3C75B15D9.TEXT");
     let woa_version = WoaVersion::HM3;
 
 
@@ -23,8 +24,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // fs::write("./target/r8.tga", r8_tga)?;
 
     let r16_texture = TextureMap::from_file(r16_path, woa_version)?;
-    let r16_tga = glacier_texture::convert::create_tga(&r16_texture)?;
-    fs::write("./target/r16.tga", r16_tga)?;
-
+    let r8_tga = glacier_texture::convert::create_tga(&r16_texture)?;
+    let r16_dds = glacier_texture::convert::create_dds(&r16_texture)?;
+    let r16_hdr = glacier_texture::convert::create_dynamic_image(&r16_texture)?;
+    r16_hdr.save_with_format("./target/r16.exr", ImageFormat::OpenExr)?;
+    fs::write("./target/r8.tga", r8_tga)?;
+    fs::write("./target/r16.dds", r16_dds)?;
     Ok(())
 }
