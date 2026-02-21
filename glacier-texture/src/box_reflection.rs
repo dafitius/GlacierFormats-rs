@@ -158,10 +158,10 @@ impl CubemapLayout{
 
 impl BoxReflection {
     #[allow(clippy::misnamed_getters)]
-    pub fn x(&self) -> f32 { self.pos.z }
+    pub fn x(&self) -> f32 { self.pos.z }// This is supposed to return z
     pub fn y(&self) -> f32 { self.pos.y }
     #[allow(clippy::misnamed_getters)]
-    pub fn z(&self) -> f32 { self.pos.x }
+    pub fn z(&self) -> f32 { self.pos.x }// This is supposed to return x
 
     pub const fn tile_width() -> usize {
         128
@@ -248,11 +248,6 @@ impl BoxReflection {
                     .map_err(BoxReflectionError::DirectXTexError)?;
 
         let face_size = pitch.slice;
-        let total_needed = face_size.checked_mul(6).unwrap();
-        if self.buffer.len() < total_needed {
-            println!("buffer too small for 6 faces")
-        }
-
         let base_ptr = self.buffer.as_mut_ptr();
 
         let images: Vec<(Vec<u8>, Image)> = (0..6).map(|face| {
