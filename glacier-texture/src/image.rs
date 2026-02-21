@@ -7,7 +7,7 @@ use crate::pack::{TextureMapBuilder, TextureMapParameters, TexturePackerError};
 use crate::texture_map::{TextureMap};
 use crate::WoaVersion;
 use binrw::{BinRead};
-use directxtex::{HResultError, ScratchImage, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT};
+use directxtex::{HResultError, ScratchImage, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT};
 use image::error::{EncodingError, ImageFormatHint};
 use image::{ColorType, ExtendedColorType, ImageDecoder, ImageEncoder, ImageError, ImageResult};
 use std::io::{BufRead, Seek, Write};
@@ -156,7 +156,7 @@ impl ImageDecoder for TextureMapDecoder {
 
     fn color_type(&self) -> ColorType {
         match self.texture.format() {
-            RenderFormat::R16G16B16A16 => ColorType::Rgba16,
+            RenderFormat::R16G16B16A16 => ColorType::Rgba32F,
             RenderFormat::R8G8B8A8 => ColorType::Rgba8,
             RenderFormat::R8G8 => ColorType::La8,
             RenderFormat::A8 => ColorType::L8,
@@ -185,6 +185,10 @@ impl ImageDecoder for TextureMapDecoder {
 
         scratch_image = crate::convert::decompress_dds(&self.texture, scratch_image).unwrap();
 
+        if scratch_image.metadata().format == DXGI_FORMAT_R16G16B16A16_FLOAT{
+            scratch_image = scratch_image.convert(DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT).map_err(DirectXTexError).unwrap();
+        }
+
         let blob = scratch_image
             .image(0, 0, 0)
             .unwrap()
@@ -192,6 +196,7 @@ impl ImageDecoder for TextureMapDecoder {
             .unwrap();
 
         let data = blob.buffer();
+
         buf.copy_from_slice(&data[data.len() - buf.len()..]);
 
         Ok(())
