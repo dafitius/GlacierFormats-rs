@@ -18,6 +18,7 @@ use std::cmp::max;
 use std::io::{Cursor, Read};
 use std::{io};
 use thiserror::Error;
+use crate::convert::decompress_dds;
 
 #[derive(Debug, Error)]
 pub enum TexturePackerError {
@@ -342,6 +343,7 @@ impl TextureMapBuilder {
                 .compress(
                     new_format,
                     TEX_COMPRESS_FLAGS::TEX_COMPRESS_BC7_QUICK,
+                    // TEX_COMPRESS_FLAGS::TEX_COMPRESS_BC7_QUICK | TEX_COMPRESS_FLAGS::TEX_COMPRESS_PARALLEL,
                     TEX_THRESHOLD_DEFAULT,
                 )
                 .map_err(DirectXTexError)?,
@@ -383,7 +385,24 @@ impl TextureMapBuilder {
             filter |= TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC;
         // }
 
-        let mut image = self.image.generate_mip_maps(
+        let mut image = self.image;
+        if image.metadata().format.is_compressed(){
+            image = directxtex::decompress(
+                image.images(),
+                image.metadata(),
+                match image.metadata().format {
+                    DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM |
+                    DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM |
+                    DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM |
+                    DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => {DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM}
+                    DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM => { DXGI_FORMAT::DXGI_FORMAT_A8_UNORM}
+                    DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM => {DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM}
+                    _ => DXGI_FORMAT::DXGI_FORMAT_UNKNOWN
+                },
+            )?;
+        }
+
+        image = image.generate_mip_maps(
             filter,
             match self.params.num_mip_levels {
                 MipLevels::All => 0,
@@ -392,7 +411,7 @@ impl TextureMapBuilder {
         )?;
 
         let target_format = self.params.format.into();
-        if self.image.metadata().format != target_format {
+        if image.metadata().format != target_format {
             image = Self::convert_to_format(image, target_format)?;
         }
 

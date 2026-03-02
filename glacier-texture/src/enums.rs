@@ -79,6 +79,18 @@ impl RenderFormat {
             RenderFormat::BC7 => 4,
         }
     }
+
+    pub fn decompressed_format(&self) -> RenderFormat{
+        match self{
+            RenderFormat::BC1 => {RenderFormat::R8G8B8A8 }
+            RenderFormat::BC2 => {RenderFormat::R8G8B8A8}
+            RenderFormat::BC3 => {RenderFormat::R8G8B8A8}
+            RenderFormat::BC4 => {RenderFormat::A8}
+            RenderFormat::BC5 => {RenderFormat::R8G8}
+            RenderFormat::BC7 => {RenderFormat::R8G8B8A8}
+            format => *format
+        }
+    }
 }
 
 impl From<RenderFormat> for DXGI_FORMAT {

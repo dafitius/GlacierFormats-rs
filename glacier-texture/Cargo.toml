@@ -22,6 +22,7 @@ serde = { version = "1.0.219", features = ["serde_derive"]}
 rpkg-rs = { path = "/home/dafitius/Documents/GitHub/rpkg-rs", features = ["path-list"], optional = true }
 png = "0.18.0"
 image = { version = "0.25.8" , default-features = false, optional = true }
+memmap2 = "0.9.8"
 
 [dependencies.glacier-base]
 path = "../glacier-base"
@@ -29,8 +30,9 @@ features = ["binrw"]
 
 [dev-dependencies]
 clap = { version = "4.5.23", features = ["derive"] }
-image = { version = "0.25.8", features = ["exr"] }
+image = { version = "0.25.8" ,features = ["tga", "dds", "exr"] }
 anyhow = "1.0.99"
+rstest = "0.26.1"
 
 [features]
 default = ["rpkg", "image"]

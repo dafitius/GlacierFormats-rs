@@ -571,7 +571,7 @@ impl TextureMap {
     }
 
     pub fn num_mip_levels(&self) -> usize {
-        if self.has_mipblock1() {
+        if self.has_mipblock1() || self.independent() {
             self.texd_mip_levels()
         } else {
             self.text_mip_levels()
@@ -687,7 +687,7 @@ impl TextureMap {
     }
 
     pub fn width(&self) -> usize {
-        if self.has_mipblock1() {
+        if self.has_mipblock1() || self.independent() {
             self.texd_size().0
         } else {
             self.text_size().0
@@ -695,11 +695,18 @@ impl TextureMap {
     }
 
     pub fn height(&self) -> usize {
-        if self.has_mipblock1() {
+        if self.has_mipblock1() || self.independent()  {
             self.texd_size().1
         } else {
             self.text_size().1
         }
+    }
+
+    ///If a TEXT is generated without a TEXD it will contain all data, we can call this concept independence.
+    pub(crate) fn independent(&self) -> bool {
+        //Check to see if the TEXT contains ALL mips, this will happen when a TEXT is generated without a TEXD.
+        let mips_size_total = self.compressed_mip_sizes().last().map(|x|*x).unwrap_or(0) as usize;
+        self.data().len() == mips_size_total //if true no TEXD exists
     }
 
     pub fn format(&self) -> RenderFormat {
@@ -761,7 +768,8 @@ impl TextureMap {
         woa_version: WoaVersion,
     ) -> Result<Self, TextureMapError> {
         let file = File::open(path).map_err(TextureMapError::IoError)?;
-        let mut reader = BufReader::new(file);
+        let mmap = unsafe { memmap2::Mmap::map(&file).map_err(TextureMapError::IoError)? };
+        let mut reader = Cursor::new(&mmap[..]);
         TextureMap::read_le_args(&mut reader, (woa_version,)).map_err(TextureMapError::ParsingError)
     }
 
@@ -784,7 +792,8 @@ impl TextureMap {
         let mut mips_sizes: Vec<u32> = self.mip_sizes();
         let mut block_sizes: Vec<u32> = self.compressed_mip_sizes();
 
-        if !self.has_mipblock1() {
+        //If the TEXT was generated with a TEXD but the TEXD isn’t loaded before reading, we adjust for the missing data.
+        if !self.has_mipblock1() && !self.independent() {
             let removed_mip = mips_sizes
                 .drain(0..removed_mip_count)
                 .collect::<Vec<u32>>()
