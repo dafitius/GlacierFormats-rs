@@ -9,7 +9,7 @@ use binrw::helpers::until_eof;
 use binrw::{binread, binrw, BinRead, BinResult, BinWrite, BinWriterExt, Endian};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Cursor, Seek, Write};
+use std::io::{BufWriter, Cursor, Seek, Write};
 use std::path::Path;
 use std::{fs, io};
 
@@ -705,7 +705,7 @@ impl TextureMap {
     ///If a TEXT is generated without a TEXD it will contain all data, we can call this concept independence.
     pub(crate) fn independent(&self) -> bool {
         //Check to see if the TEXT contains ALL mips, this will happen when a TEXT is generated without a TEXD.
-        let mips_size_total = self.compressed_mip_sizes().last().map(|x|*x).unwrap_or(0) as usize;
+        let mips_size_total = self.compressed_mip_sizes().last().copied().unwrap_or(0) as usize;
         self.data().len() == mips_size_total //if true no TEXD exists
     }
 

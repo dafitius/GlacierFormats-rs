@@ -18,7 +18,6 @@ use std::cmp::max;
 use std::io::{Cursor, Read};
 use std::{io};
 use thiserror::Error;
-use crate::convert::decompress_dds;
 
 #[derive(Debug, Error)]
 pub enum TexturePackerError {

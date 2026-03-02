@@ -106,7 +106,7 @@ pub struct BoxReflection {
     pub(crate) buffer: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CubemapLayout {
     HorizontalStrip,
     VerticalStrip,
@@ -205,9 +205,9 @@ impl BoxReflection {
         let layout = CubemapLayout::from_tile_counts(cols, rows);
 
         if let Some(layout) = layout {
-            let scratch_image = scratch_image.convert(DXGI_FORMAT_R16G16B16A16_UNORM, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
+            let scratch_image = scratch_image.convert(DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
             let scratch = cubemap_utils::decompose_layout(scratch_image.image(0,0,0).unwrap(), layout)?;
-            let image = cubemap_utils::compose_layout(&scratch, CubemapLayout::VerticalStrip)?;
+            let image = cubemap_utils::compose_layout(&scratch, CubemapLayout::VerticalStrip, true)?;
             let compressed = image.compress(DXGI_FORMAT_BC6H_UF16, TEX_COMPRESS_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
             let image = compressed.image(0,0,0).unwrap();
             let buffer = convert::image_pixels(image).unwrap_or_default();
@@ -230,7 +230,7 @@ impl BoxReflection {
         let scratch = match layout {
             None => {cubemap}
             Some(layout) => {
-               cubemap_utils::compose_layout(&cubemap, layout)?
+               cubemap_utils::compose_layout(&cubemap, layout, true)?
             }
         };
 
@@ -241,6 +241,12 @@ impl BoxReflection {
         let bytes = blob.buffer();
         Ok(Vec::from(bytes))
     }
+
+    #[cfg(feature = "image")]
+    pub fn create_dynamic_image(&mut self, layout: CubemapLayout) -> Result<DynamicImage, BoxReflectionError> {
+        unimplemented!()
+    }
+
     fn create_cubemap_image(&mut self, decompressed: bool) -> Result<ScratchImage, BoxReflectionError> {
 
         let pitch = DXGI_FORMAT_BC6H_UF16
@@ -470,7 +476,11 @@ pub mod cubemap_utils {
         }
     }
 
-    pub fn compose_layout(images: &ScratchImage, layout: CubemapLayout) -> Result<ScratchImage, BoxReflectionError> {
+    pub fn compose_layout(images: &ScratchImage, layout: CubemapLayout, correct_z: bool) -> Result<ScratchImage, BoxReflectionError> {
+
+        if images.metadata().format != DXGI_FORMAT_R16G16B16A16_FLOAT {
+            return Err(BoxReflectionError::Other(format!("Invalid format ({:?}), the Image format must be 4-channel half-float", images.metadata().format)))
+        }
 
         let face_w = BoxReflection::tile_width();
         let face_h = BoxReflection::tile_height();
@@ -497,7 +507,11 @@ pub mod cubemap_utils {
         for face_index in 0..6 {
             let face_image = images.image(0, face_index, 0)
                 .ok_or(BoxReflectionError::Other("Failed to find cubemap image".into()))?;
-            if let (Some(new_face_idx), rotation) =  map_face_and_image_rotation(Axis::Z, Rotate90, face_index){
+
+            let face_mapping = if correct_z { map_face_and_image_rotation(Axis::Z, Rotate90, face_index)}
+            else {(Some(face_index), None)};
+
+            if let (Some(new_face_idx), rotation) = face_mapping {
                 rotate_image(face_image, rotation);
                 let (tile_x, tile_y) = face_tile_positions[new_face_idx];
 
@@ -517,6 +531,10 @@ pub mod cubemap_utils {
     pub fn decompose_layout(image: &Image, layout: CubemapLayout) -> Result<ScratchImage, BoxReflectionError> {
         let face_w = BoxReflection::tile_width();
         let face_h = BoxReflection::tile_height();
+
+        if image.format != DXGI_FORMAT_R16G16B16A16_FLOAT {
+            return Err(BoxReflectionError::Other(format!("Invalid format ({:?}), the Image format must be 4-channel half-float", image.format)))
+        }
 
         let bytes_per_pixel: usize = 8;
 
