@@ -78,6 +78,8 @@ impl RenderPrimitive {
     pub fn flags(&self) -> PrimPropertyFlags {
         self.data.property_flags
     }
+    
+    pub fn bone_rig_resource_index(&self) -> Option<u32> { self.data.bone_rig_resource_index }
 }
 
 impl BinWrite for RenderPrimitive {
