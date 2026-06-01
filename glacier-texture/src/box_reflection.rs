@@ -11,6 +11,7 @@ use crate::image::helpers;
 #[cfg(feature = "image")]
 use image::{ColorType, DynamicImage, ExtendedColorType};
 use glacier_base::math::Vector3;
+use crate::box_reflection::cubemap_utils::Orientation;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoxReflectionError {
@@ -207,7 +208,7 @@ impl BoxReflection {
         if let Some(layout) = layout {
             let scratch_image = scratch_image.convert(DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
             let scratch = cubemap_utils::decompose_layout(scratch_image.image(0,0,0).unwrap(), layout)?;
-            let image = cubemap_utils::compose_layout(&scratch, CubemapLayout::VerticalStrip, true)?;
+            let image = cubemap_utils::compose_layout(&scratch, CubemapLayout::VerticalStrip)?;
             let compressed = image.compress(DXGI_FORMAT_BC6H_UF16, TEX_COMPRESS_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
             let image = compressed.image(0,0,0).unwrap();
             let buffer = convert::image_pixels(image).unwrap_or_default();
@@ -226,11 +227,15 @@ impl BoxReflection {
     }
 
     pub fn create_dds(&mut self, layout: Option<CubemapLayout>) -> Result<Vec<u8>, BoxReflectionError> {
+        self.create_dds_with_rotation(layout, [None, None, None])
+    }
+
+    pub fn create_dds_with_rotation(&mut self, layout: Option<CubemapLayout>, rotation: [Option<Orientation>; 3]) -> Result<Vec<u8>, BoxReflectionError> {
         let cubemap = self.create_cubemap_image(true)?;
         let scratch = match layout {
             None => {cubemap}
             Some(layout) => {
-               cubemap_utils::compose_layout(&cubemap, layout, true)?
+               cubemap_utils::compose_layout_with_rotation(&cubemap, layout, rotation)?
             }
         };
 
@@ -395,20 +400,22 @@ impl FromIterator<BoxReflection> for BoxReflectionCollection {
 }
 
 pub mod cubemap_utils {
+    use std::ops::Add;
+    use binrw::{BinRead, BinWrite};
     use bitfield_struct::bitfield;
     use directxtex::{Rect, ScratchImage, CP_FLAGS_NONE, DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_FILTER_DEFAULT, TEX_FILTER_FLAGS};
-    use crate::box_reflection::cubemap_utils::Rotate::{Rotate180, Rotate270, Rotate90};
+    use crate::box_reflection::cubemap_utils::Orientation::{Rotate180, Rotate270, Rotate90};
     use super::{Image, CubemapLayout, BoxReflectionError, BoxReflection};
 
 
     #[derive(Copy, Clone, Debug)]
-    pub enum Rotate{
+    pub enum Orientation {
         Rotate90,
         Rotate180,
         Rotate270,
     }
 
-    impl Rotate {
+    impl Orientation {
         pub fn degrees(&self) -> usize {
             match self {
                 Rotate90 => {90}
@@ -426,7 +433,7 @@ pub mod cubemap_utils {
         _rem: u8,
     }
 
-    pub fn rotate_image(image: &Image, rotate: Option<Rotate>) {
+    pub fn rotate_image(image: &Image, rotate: Option<Orientation>) {
         use std::{ptr, slice};
 
         let pixel_stride = image.format.bits_per_pixel() / 8;
@@ -476,7 +483,11 @@ pub mod cubemap_utils {
         }
     }
 
-    pub fn compose_layout(images: &ScratchImage, layout: CubemapLayout, correct_z: bool) -> Result<ScratchImage, BoxReflectionError> {
+    pub fn compose_layout(images: &ScratchImage, layout: CubemapLayout) -> Result<ScratchImage, BoxReflectionError> {
+        compose_layout_with_rotation(images, layout, [None, None, None])
+    }
+
+    pub fn compose_layout_with_rotation(images: &ScratchImage, layout: CubemapLayout, rotation: [Option<Orientation>; 3]) -> Result<ScratchImage, BoxReflectionError> {
 
         if images.metadata().format != DXGI_FORMAT_R16G16B16A16_FLOAT {
             return Err(BoxReflectionError::Other(format!("Invalid format ({:?}), the Image format must be 4-channel half-float", images.metadata().format)))
@@ -508,8 +519,12 @@ pub mod cubemap_utils {
             let face_image = images.image(0, face_index, 0)
                 .ok_or(BoxReflectionError::Other("Failed to find cubemap image".into()))?;
 
-            let face_mapping = if correct_z { map_face_and_image_rotation(Axis::Z, Rotate90, face_index)}
-            else {(Some(face_index), None)};
+            let mut rotation_steps = vec![];
+            rotation_steps.push((Axis::Z, Rotate90)); //Adding this default rotation step to adjust for the standard rotation used by IOI.
+            if let Some(x_rot) = rotation[0]{ rotation_steps.push((Axis::X, x_rot)); }
+            if let Some(y_rot) = rotation[1]{ rotation_steps.push((Axis::Y, y_rot)); }
+            if let Some(z_rot) = rotation[2]{ rotation_steps.push((Axis::Z, z_rot)); }
+            let face_mapping = map_face_and_image_rotations(face_index, rotation_steps);
 
             if let (Some(new_face_idx), rotation) = face_mapping {
                 rotate_image(face_image, rotation);
@@ -604,7 +619,45 @@ pub mod cubemap_utils {
     enum Axis { X, Y, Z }
     type Vec3 = (i8, i8, i8);
 
-    fn rotate_vec(axis: Axis, rot: Rotate, (x,y,z): Vec3) -> Vec3 {
+
+    impl Orientation {
+        pub fn to_deg(&self) -> u16 {
+            match self {
+                Rotate90 => 90,
+                Rotate180 => 180,
+                Rotate270 => 270,
+            }
+        }
+
+        pub fn  from_deg(d: u16) -> Orientation {
+            match (d % 360 + 360) % 360 {
+                90 => Rotate90,
+                180 => Rotate180,
+                270 => Rotate270,
+                0 => Rotate90, // unreachable for pure Rotate math (no identity)
+                _ => unreachable!(),
+            }
+        }
+
+        pub fn add(current: Option<Orientation>, step: Option<Orientation>) -> Option<Orientation> {
+            match (current, step) {
+                (None, None) => None,
+                (Some(r), None) | (None, Some(r)) => Some(r),
+                (Some(a), Some(b)) => {
+                    let sum = (a.to_deg() + b.to_deg()) % 360;
+                    match sum {
+                        0 => None,
+                        90 => Some(Rotate90),
+                        180 => Some(Rotate180),
+                        270 => Some(Rotate270),
+                        _ => unreachable!(),
+                    }
+                }
+            }
+        }
+    }
+
+    fn rotate_vec(axis: Axis, rot: Orientation, (x,y,z): Vec3) -> Vec3 {
         match axis {
             Axis::X => match rot { //was y
                 Rotate270  => ( z,  y, -x),
@@ -637,7 +690,7 @@ pub mod cubemap_utils {
     }
     fn neg(v: Vec3) -> Vec3 { (-v.0, -v.1, -v.2) }
 
-    fn map_face_and_image_rotation(axis: Axis, rot: Rotate, face_index: usize) -> (Option<usize>, Option<Rotate>) {
+    fn map_face_and_image_rotation(axis: Axis, rot: Orientation, face_index: usize) -> (Option<usize>, Option<Orientation>) {
         let (n_src, r_src, _) = face_axes(face_index).unwrap();
         let n_rot = rotate_vec(axis, rot, n_src);
         let r_rot = rotate_vec(axis, rot, r_src);
@@ -663,5 +716,23 @@ pub mod cubemap_utils {
         };
 
         (dst, rot)
+    }
+
+    fn map_face_and_image_rotations(
+        face_index: usize,
+        steps: Vec<(Axis, Orientation)>,
+    ) -> (Option<usize>, Option<Orientation>) {
+        let mut new_index = face_index;
+        let mut new_rot: Option<Orientation> = None;
+        for (axis, rot) in steps {
+            let (new_face, step_face_rot) = map_face_and_image_rotation(axis, rot, new_index);
+            let new_face = match new_face {
+                Some(f) => f,
+                None => return (None, None),
+            };
+            new_index = new_face;
+            new_rot = Orientation::add(new_rot, step_face_rot);
+        }
+        (Some(new_index), new_rot)
     }
 }

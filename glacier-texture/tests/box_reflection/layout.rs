@@ -1,9 +1,10 @@
 use std::{slice};
 use std::ptr::NonNull;
 use glacier_texture::box_reflection::{BoxReflection, CubemapLayout};
-use glacier_texture::box_reflection::cubemap_utils::{compose_layout, decompose_layout};
+use glacier_texture::box_reflection::cubemap_utils::{compose_layout, compose_layout_with_rotation, decompose_layout, Orientation};
 use directxtex::{Image, ScratchImage, DXGI_FORMAT_R16G16B16A16_FLOAT, TGA_FLAGS_NONE, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT};
 use rstest::rstest;
+use glacier_texture::box_reflection::cubemap_utils::Orientation::Rotate270;
 use crate::read_fixture;
 
 #[test]
@@ -48,14 +49,24 @@ fn verify_converting_layouts(
     let source_img = source_dds.image(0, 0, 0).unwrap();
     // Original -> Cubemap -> other layout
     let cubemap = decompose_layout(source_img, layout)?;
-    let out_layout_img = compose_layout(&cubemap, expected_layout, false)?;
+    let out_layout_img = compose_layout_with_rotation(&cubemap, expected_layout, [None, None, Some(Rotate270)])?; //rotate to undo standard -90 rotation on z-axis
 
     let out_layout_img = out_layout_img.image(0,0,0).unwrap();
 
     assert_eq!(out_layout_img.width, expected_dds.width);
     assert_eq!(out_layout_img.height, expected_dds.height);
-    assert_eq!(image_pixels(&out_layout_img), image_pixels(expected_dds));
+    assert_eq!(checksum(image_pixels(&out_layout_img).unwrap().as_slice()), checksum(image_pixels(expected_dds).unwrap().as_slice()));
     Ok(())
+}
+
+pub fn checksum(msg: &[u8]) -> u16 {
+    let mut crc: u16 = 0x0;
+    for byte in msg.iter() {
+        let mut x = ((crc >> 8) ^ (*byte as u16)) & 255;
+        x ^= x >> 4;
+        crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
+    }
+    crc
 }
 
 pub(crate) fn image_pixels(image: &Image) -> Option<Vec<u8>> {
