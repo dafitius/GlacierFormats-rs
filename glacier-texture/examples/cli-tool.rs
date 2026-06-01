@@ -9,7 +9,7 @@ use glacier_texture::convert;
 use glacier_texture::mipblock::MipblockData;
 use glacier_texture::pack::TextureMapBuilder;
 use glacier_texture::texture_map::TextureMap;
-use glacier_texture::WoaVersion;
+use glacier_texture::GlacierGame;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -53,7 +53,7 @@ struct GlobalOpts {
 struct ConvertTextureMap {
     /// Version of the game you want to convert from options: [HM2016, HM2, HM3]
     #[clap(short, long)]
-    game_version: WoaVersion,
+    game_version: GlacierGame,
 
     /// Path to the .text file
     #[arg(short, long)]
@@ -69,7 +69,7 @@ struct ConvertTextureMap {
 struct GenerateTextureMap {
     /// Version of the game you want to generate for, options: [HM2016, HM2, HM3]
     #[clap(short, long)]
-    game_version: WoaVersion,
+    game_version: GlacierGame,
 
     /// Path to the input file
     #[arg(short, long)]
@@ -85,11 +85,11 @@ struct GenerateTextureMap {
 struct PortTextureMap {
     /// Version of the game you want to port from, options: [HM2016, HM2, HM3]
     #[clap(short, long)]
-    from_version: WoaVersion,
+    from_version: GlacierGame,
 
     /// Version of the game you want to port to, options: [HM2016, HM2, HM3]
     #[clap(short, long)]
-    to_version: WoaVersion,
+    to_version: GlacierGame,
 
     /// Path to the input .text file
     #[arg(short, long)]

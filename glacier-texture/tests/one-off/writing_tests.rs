@@ -61,11 +61,11 @@ fn write_all_in_h3() {
 }
 
 
-fn write_all_text_texd_in_game(woa_version: rpkg_rs::WoaVersion, game_paths: GamePaths) {
+fn write_all_text_texd_in_game(glacier_game: rpkg_rs::WoaVersion, game_paths: GamePaths) {
 
     // Read and parse the package definition.
     let package_definition_source =
-        PackageDefinitionSource::from_file(game_paths.package_definition_path, woa_version)
+        PackageDefinitionSource::from_file(game_paths.package_definition_path, glacier_game)
             .unwrap_or_else(|e| {
                 eprintln!("failed to parse package definition: {}", e);
                 std::process::exit(0);

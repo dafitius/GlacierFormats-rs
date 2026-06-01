@@ -5,25 +5,26 @@ use crate::box_reflection::{BoxReflectionCache};
 use crate::mipblock::MipblockData;
 use crate::pack::TexturePackerError;
 use crate::texture_map::TextureMap;
-use crate::WoaVersion;
+use crate::GlacierGame;
 
 
-impl From<rpkg_rs::WoaVersion> for WoaVersion {
+impl From<rpkg_rs::WoaVersion> for GlacierGame {
     fn from(value: rpkg_rs::WoaVersion) -> Self {
         match value {
-            rpkg_rs::WoaVersion::HM2016 => { WoaVersion::HM2016 }
-            rpkg_rs::WoaVersion::HM2 => { WoaVersion::HM2 }
-            rpkg_rs::WoaVersion::HM3 => { WoaVersion::HM3 }
+            rpkg_rs::WoaVersion::HM2016 => { GlacierGame::HM2016 }
+            rpkg_rs::WoaVersion::HM2 => { GlacierGame::HM2 }
+            rpkg_rs::WoaVersion::HM3 => { GlacierGame::HM3 }
         }
     }
 }
 
-impl From<WoaVersion> for rpkg_rs::WoaVersion{
-    fn from(value: WoaVersion) -> Self {
+impl From<GlacierGame> for rpkg_rs::WoaVersion{
+    fn from(value: GlacierGame) -> Self {
         match value {
-            WoaVersion::HM2016 => { rpkg_rs::WoaVersion::HM2016 }
-            WoaVersion::HM2 => { rpkg_rs::WoaVersion::HM2 }
-            WoaVersion::HM3 => { rpkg_rs::WoaVersion::HM3 }
+            GlacierGame::HM2016 => { rpkg_rs::WoaVersion::HM2016 }
+            GlacierGame::HM2 => { rpkg_rs::WoaVersion::HM2 }
+            GlacierGame::HM3 => { rpkg_rs::WoaVersion::HM3 }
+            GlacierGame::KNT => { todo!() }
         }
     }
 }
@@ -31,9 +32,9 @@ impl From<WoaVersion> for rpkg_rs::WoaVersion{
 impl GlacierResource for TextureMap {
     type Output = TextureMap;
 
-    fn process_data<R: AsRef<[u8]>>(woa_version: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
+    fn process_data<R: AsRef<[u8]>>(glacier_game: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
         let mut stream = Cursor::new(data);
-        TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
+        TextureMap::read_le_args(&mut stream, (GlacierGame::from(glacier_game), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
     fn serialize(&self, _: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
@@ -62,9 +63,10 @@ impl GlacierResource for TextureMap {
 
     fn should_compress(&self) -> bool {
         match self.version(){
-            WoaVersion::HM2016 => {true}
-            WoaVersion::HM2 |
-            WoaVersion::HM3 => {false}
+            GlacierGame::HM2016 => {true}
+            GlacierGame::HM2 |
+            GlacierGame::HM3 |
+            GlacierGame::KNT => {false}
         }
     }
 }
@@ -110,7 +112,7 @@ pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionMan
     let data = manager.read_resource_from("chunk0".parse().unwrap(), rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
 
     let mut stream = Cursor::new(data);
-    let mut texture_map = TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+    let mut texture_map = TextureMap::read_le_args(&mut stream, (GlacierGame::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
 
     if let Some((rrid, _)) = res_info.references().first(){
         let texd_data = manager.read_resource_from("chunk0".parse().unwrap(), *rrid).map_err(|e| GlacierResourceError::ReadError(format!("Tried to load broken depend: {e}")))?;

@@ -14,6 +14,7 @@ pub enum TextureType
     Height = 2,
     CompoundNormal = 3,
     Billboard = 4,
+    UNKNOWN5 = 5, //introduced in knt
     Projection = 6,
     Emission = 16,
     //UNKNOWN64 = 64, //unused
@@ -21,6 +22,7 @@ pub enum TextureType
     //UNKNOWN128 = 128, //unused in H2, H3
     Cubemap = 256, //uses ascolormap and ascubemap
     UNKNOWN512 = 512, //asheightmap
+    UNKNOWN517 = 517, //introduced in knt
     //UNKNOWN1024 = 1024, //unused
 }
 
@@ -40,21 +42,22 @@ pub enum InterpretAs
 }
 
 
-#[derive(BinRead, BinWrite, Serialize, Deserialize, Debug, Copy)]
-#[brw(repr = u16)]
+#[derive(Serialize, Deserialize, Debug, Copy)]
 #[derive(Clone, PartialEq, Hash, Eq)]
 pub enum RenderFormat
 {
-    R16G16B16A16 = 0x0A,
-    R8G8B8A8 = 0x1C,
-    R8G8 = 0x34,
-    A8 = 0x42,
-    BC1 = 0x49,
-    BC2 = 0x4C,
-    BC3 = 0x4F,
-    BC4 = 0x52,
-    BC5 = 0x55,
-    BC7 = 0x5A,
+    R32G32B32A32, //idk
+    R16G16B16A16,
+    R8G8B8A8,
+    R32,
+    R8G8,
+    A8,
+    BC1,
+    BC2,
+    BC3,
+    BC4,
+    BC5,
+    BC7,
 }
 
 impl RenderFormat {
@@ -69,9 +72,10 @@ impl RenderFormat {
 
     pub fn num_channels(&self) -> usize {
         match self {
-            RenderFormat::A8 | RenderFormat::BC4 => 1,
+            RenderFormat::A8 | RenderFormat::R32 | RenderFormat::BC4 => 1,
             RenderFormat::R8G8 | RenderFormat::BC5 => 2,
             RenderFormat::BC1 | //assume DXT1a
+            RenderFormat::R32G32B32A32 |
             RenderFormat::R16G16B16A16 |
             RenderFormat::R8G8B8A8 |
             RenderFormat::BC2 |
@@ -96,8 +100,10 @@ impl RenderFormat {
 impl From<RenderFormat> for DXGI_FORMAT {
     fn from(value: RenderFormat) -> Self {
         match value {
+            RenderFormat::R32G32B32A32 => { DXGI_FORMAT::DXGI_FORMAT_R32G32B32A32_FLOAT }
             RenderFormat::R16G16B16A16 => { DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_FLOAT } // has to be float
             RenderFormat::R8G8B8A8 => { DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM }
+            RenderFormat::R32 => {DXGI_FORMAT::DXGI_FORMAT_R32_FLOAT }
             RenderFormat::R8G8 => { DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM }
             RenderFormat::A8 => { DXGI_FORMAT::DXGI_FORMAT_A8_UNORM }
             RenderFormat::BC1 => { DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM }
@@ -109,6 +115,111 @@ impl From<RenderFormat> for DXGI_FORMAT {
         }
     }
 }
+
+pub trait RenderFormatMapping {
+    const MAP: &'static [(u16, RenderFormat)];
+
+    fn try_from_u16(raw: u16) -> Option<RenderFormat> {
+        Self::MAP
+            .iter()
+            .find(|(r, _)| *r == raw)
+            .map(|(_, f)| *f)
+    }
+
+    fn try_to_u16(format: RenderFormat) -> Option<u16> {
+        Self::MAP
+            .iter()
+            .find(|(_, f)| *f == format)
+            .map(|(r, _)| *r)
+    }
+}
+
+#[derive(BinRead, BinWrite, Serialize, Deserialize, Debug, Copy)]
+#[derive(Clone, PartialEq, Hash, Eq)]
+pub struct WoaRenderFormat {
+    #[br(try_map = |raw: u16| Self::try_from_u16(raw).ok_or("invalid WOA render format"))]
+    #[bw(map = |fmt: &RenderFormat| Self::try_to_u16(*fmt).expect("unsupported WOA render format"))]
+    pub(crate) format: RenderFormat,
+}
+
+impl RenderFormatMapping for WoaRenderFormat{
+    const MAP: &'static [(u16, RenderFormat)] = &[
+        (0x02, RenderFormat::R32G32B32A32),
+        (0x0A, RenderFormat::R16G16B16A16),
+        (0x1C, RenderFormat::R8G8B8A8),
+        (0x34, RenderFormat::R8G8),
+        (0x42, RenderFormat::A8),
+        (0x49, RenderFormat::BC1),
+        (0x4C, RenderFormat::BC2),
+        (0x4F, RenderFormat::BC3),
+        (0x52, RenderFormat::BC4),
+        (0x55, RenderFormat::BC5),
+        (0x5A, RenderFormat::BC7)
+    ];
+}
+
+impl From<WoaRenderFormat> for RenderFormat {
+    fn from(format: WoaRenderFormat) -> Self {
+        format.format
+    }
+}
+
+impl PartialEq<RenderFormat> for WoaRenderFormat {
+    fn eq(&self, other: &RenderFormat) -> bool {
+        self.format == *other
+    }
+}
+
+impl PartialEq<WoaRenderFormat> for RenderFormat {
+    fn eq(&self, other: &WoaRenderFormat) -> bool {
+        *self == other.format
+    }
+}
+
+
+#[derive(BinRead, BinWrite, Serialize, Deserialize, Debug, Copy)]
+#[derive(Clone, PartialEq, Hash, Eq)]
+pub struct BondRenderFormat {
+    #[br(try_map = |raw: u16| Self::try_from_u16(raw).ok_or(format!("invalid Bond render format {}", raw)))]
+    #[bw(map = |fmt: &RenderFormat| Self::try_to_u16(*fmt).expect("unsupported Bond render format"))]
+    format: RenderFormat,
+}
+
+impl RenderFormatMapping for BondRenderFormat{
+    const MAP: &'static [(u16, RenderFormat)] = &[
+        (0x02, RenderFormat::R32G32B32A32),
+        (0x0A, RenderFormat::R16G16B16A16),
+        (0x1C, RenderFormat::R8G8B8A8),
+        (0x2C, RenderFormat::R32),
+        (0x34 + 3, RenderFormat::R8G8),
+        (0x42 + 3, RenderFormat::A8),
+        (0x49 + 3, RenderFormat::BC1),
+        (0x4C + 3 , RenderFormat::BC2),
+        (0x4F + 3, RenderFormat::BC3),
+        (0x52 + 3, RenderFormat::BC4),
+        (0x55 + 3, RenderFormat::BC5),
+        (0x5A + 4, RenderFormat::BC7)
+    ];
+}
+
+impl From<BondRenderFormat> for RenderFormat {
+    fn from(format: BondRenderFormat) -> Self {
+        format.format
+    }
+}
+
+impl PartialEq<RenderFormat> for BondRenderFormat {
+    fn eq(&self, other: &RenderFormat) -> bool {
+        self.format == *other
+    }
+}
+
+impl PartialEq<BondRenderFormat> for RenderFormat {
+    fn eq(&self, other: &BondRenderFormat) -> bool {
+        *self == other.format
+    }
+}
+
 
 #[derive(Debug, Error)]
 #[error("Unsupported DXGI_FORMAT")]

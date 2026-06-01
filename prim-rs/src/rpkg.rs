@@ -14,7 +14,7 @@ impl GlacierResource for RenderPrimitive {
             .map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
-    fn serialize(&self, woa_version: WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
+    fn serialize(&self, glacier_game: WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
         todo!()
     }
 

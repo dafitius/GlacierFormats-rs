@@ -9,7 +9,7 @@ use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use glacier_texture::enums::{InterpretAs, RenderFormat, TextureType};
 use glacier_texture::pack::MipFilter::Linear;
 use glacier_texture::pack::TextureMapBuilder;
-use glacier_texture::WoaVersion;
+use glacier_texture::GlacierGame;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tga_path = PathBuf::from("./target/texture.tga");
     let text_rrid = RuntimeResourceID::from_hex_string("000210D1CF04E4E4")?;
     let texd_rrid = RuntimeResourceID::from_hex_string("00752CEA9F76AB7E")?;
-    let woa_version = WoaVersion::HM3;
+    let glacier_game = GlacierGame::HM3;
 
     let partition_id : PartitionId = "chunk12".parse().unwrap();
     let patch_id : PatchId = PatchId::Patch(5);
@@ -35,13 +35,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .texture_type(TextureType::Colour)
             .with_mip_filter(Linear)
             .with_mipblock1(add_texd)
-            .with_format(RenderFormat::BC1).build(woa_version)?;
+            .with_format(RenderFormat::BC1).build(glacier_game)?;
 
     //Add resources to package
-    let mut texture_resource = PackageResourceBuilder::from_glacier_resource(text_rrid, &texture, woa_version.into())?;
+    let mut texture_resource = PackageResourceBuilder::from_glacier_resource(text_rrid, &texture, glacier_game.into())?;
     if texture.has_mipblock1(){
         let mipblock1 = texture.mipblock1().unwrap();
-        let highmip_resource = PackageResourceBuilder::from_glacier_resource(texd_rrid, &mipblock1, woa_version.into())?;
+        let highmip_resource = PackageResourceBuilder::from_glacier_resource(texd_rrid, &mipblock1, glacier_game.into())?;
         texture_resource.with_reference(texd_rrid, ResourceReferenceFlags::Standard(ResourceReferenceFlagsStandard::new().with_reference_type(ReferenceType::WEAK)));
         package.with_resource(highmip_resource);
     }

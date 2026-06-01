@@ -5,7 +5,7 @@ use glacier_texture::enums::{InterpretAs, RenderFormat, TextureType};
 use glacier_texture::mipblock::MipblockData;
 use glacier_texture::pack::{MipFilter, MipLevels, TextureMapBuilder};
 use glacier_texture::texture_map::TextureMap;
-use glacier_texture::WoaVersion;
+use glacier_texture::GlacierGame;
 use rstest::rstest;
 use crate::read_fixture;
 
@@ -16,7 +16,7 @@ use crate::read_fixture;
 #[case("source/R8G8B8A8_UNORM.tga", RenderFormat::R8G8B8A8)]
 fn tga_packing_text_texd(
     #[case] source_path: &str, #[case] source_format: RenderFormat,
-    #[values(WoaVersion::HM2016, WoaVersion::HM2, WoaVersion::HM3)] game_version: WoaVersion,
+    #[values(GlacierGame::HM2016, GlacierGame::HM2, GlacierGame::HM3)] game_version: GlacierGame,
     #[values(MipLevels::All, MipLevels::Limit(2))] mip_mode: MipLevels,
     #[values(true, false)] texd_mode: bool,
     #[values(true, false)] read_texd: bool) -> Result<(), Box<dyn std::error::Error>> {

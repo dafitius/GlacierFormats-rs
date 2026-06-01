@@ -4,7 +4,7 @@ use glacier_texture::image::{TextureMapDecoder, TextureMapEncoder};
 use glacier_texture::mipblock::MipblockData;
 use glacier_texture::pack::{TextureMapBuilder, TextureMapParameters};
 use glacier_texture::texture_map::TextureMap;
-use glacier_texture::{convert, WoaVersion};
+use glacier_texture::{convert, GlacierGame};
 use image::{DynamicImage};
 use std::io::{BufReader, BufWriter, Cursor};
 use std::path::PathBuf;
@@ -49,21 +49,21 @@ fn main_low_level(input_path: PathBuf, output_path: PathBuf) -> Result<(), Box<d
     let enc = TextureMapEncoder::new(
         text_writer,
         Some(texd_writer),
-        WoaVersion::HM3,
+        GlacierGame::HM3,
         Some(params),
         None,
     );
     jpeg.write_with_encoder(enc)?;
 
     //read buffers into texture_map
-    let mut texture_map = TextureMap::from_memory(&*text, WoaVersion::HM3)?;
-    texture_map.set_mipblock1(MipblockData::from_memory(&*texd, WoaVersion::HM3)?);
+    let mut texture_map = TextureMap::from_memory(&*text, GlacierGame::HM3)?;
+    texture_map.set_mipblock1(MipblockData::from_memory(&*texd, GlacierGame::HM3)?);
 
     //Set up readers
     let text_reader = BufReader::new(Cursor::new(text));
     let texd_reader = BufReader::new(Cursor::new(texd));
 
-    let dec = TextureMapDecoder::new(text_reader, Some(texd_reader), WoaVersion::HM3);
+    let dec = TextureMapDecoder::new(text_reader, Some(texd_reader), GlacierGame::HM3);
     let image = DynamicImage::from_decoder(dec)?;
     image.save(output_path)?;
     Ok(())
@@ -78,7 +78,7 @@ fn main_high_level(input_path: PathBuf, output_path: PathBuf) -> Result<(), Box<
     let texture_map = TextureMapBuilder::from_dynamic_image(jpeg)?
         .with_format(RenderFormat::BC7)
         .with_texture_type(TextureType::Colour)
-        .build(WoaVersion::HM3)?;
+        .build(GlacierGame::HM3)?;
     
     //create and save image
     let image = convert::create_dynamic_image(&texture_map)?;

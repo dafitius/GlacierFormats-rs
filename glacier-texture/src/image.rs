@@ -5,8 +5,8 @@ use crate::enums::RenderFormat;
 use crate::mipblock::MipblockData;
 use crate::pack::{TextureMapBuilder, TextureMapParameters, TexturePackerError};
 use crate::texture_map::{TextureMap};
-use crate::WoaVersion;
-use binrw::{BinRead};
+use crate::GlacierGame;
+use binrw::BinRead;
 use directxtex::{HResultError, ScratchImage, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT};
 use image::error::{EncodingError, ImageFormatHint};
 use image::{ColorType, ExtendedColorType, ImageDecoder, ImageEncoder, ImageError, ImageResult};
@@ -38,7 +38,7 @@ impl From<TextureMapEncodeError> for ImageError {
 pub struct TextureMapEncoder<TW: Write, DW: Write> {
     text_writer: TW,
     texd_writer: Option<DW>,
-    woa_version: WoaVersion,
+    glacier_game: GlacierGame,
     texture_parameters: Option<TextureMapParameters>,
     atlas_data: Option<AtlasData>,
 }
@@ -47,14 +47,14 @@ impl<TW: Write, DW: Write> TextureMapEncoder<TW, DW> {
     pub fn new(
         text_writer: TW,
         texd_writer: Option<DW>,
-        woa_version: WoaVersion,
+        glacier_game: GlacierGame,
         texture_parameters: Option<TextureMapParameters>,
         atlas_data: Option<AtlasData>,
     ) -> TextureMapEncoder<TW, DW> {
         TextureMapEncoder {
             text_writer,
             texd_writer,
-            woa_version,
+            glacier_game,
             texture_parameters,
             atlas_data,
         }
@@ -82,7 +82,7 @@ impl<TW: Write, DW: Write> ImageEncoder for TextureMapEncoder<TW, DW> {
         }
 
         let text = builder
-            .build(self.woa_version)
+            .build(self.glacier_game)
             .map_err(TextureMapEncodeError::Packer)?;
         let text_data = text.pack_to_vec().map_err(TextureMapEncodeError::Packer)?;
 
@@ -92,7 +92,7 @@ impl<TW: Write, DW: Write> ImageEncoder for TextureMapEncoder<TW, DW> {
         if let Some(mut texd_writer) = self.texd_writer {
             if let Some(texd) = text.mipblock1() {
                 let texd_data = texd
-                    .pack_to_vec(self.woa_version)
+                    .pack_to_vec(self.glacier_game)
                     .map_err(TextureMapEncodeError::Packer)?;
                 texd_writer.write_all(&texd_data)?;
             }
@@ -132,13 +132,13 @@ impl TextureMapDecoder {
     pub fn new<TR: BufRead + Seek, DR: BufRead + Seek>(
         mut text_reader: TR,
         texd_reader: Option<DR>,
-        woa_version: WoaVersion,
+        glacier_game: GlacierGame,
     ) -> Self {
-        let mut texture = TextureMap::read_le_args(&mut text_reader, (woa_version,)).unwrap();
+        let mut texture = TextureMap::read_le_args(&mut text_reader, (glacier_game,)).unwrap();
         if let Some(mut texd_reader) = texd_reader {
             let mut buf = Vec::new();
             texd_reader.read_to_end(&mut buf).unwrap();
-            let mip_data = MipblockData::from_memory(&buf, woa_version).unwrap();
+            let mip_data = MipblockData::from_memory(&buf, glacier_game).unwrap();
             texture.set_mipblock1(mip_data);
         }
         Self { texture }
@@ -156,8 +156,10 @@ impl ImageDecoder for TextureMapDecoder {
 
     fn color_type(&self) -> ColorType {
         match self.texture.format() {
+            RenderFormat::R32G32B32A32 => ColorType::Rgba32F,
             RenderFormat::R16G16B16A16 => ColorType::Rgba32F,
             RenderFormat::R8G8B8A8 => ColorType::Rgba8,
+            RenderFormat::R32 => ColorType::Rgb32F,
             RenderFormat::R8G8 => ColorType::La8,
             RenderFormat::A8 => ColorType::L8,
             RenderFormat::BC1 => ColorType::Rgba8,
@@ -173,7 +175,12 @@ impl ImageDecoder for TextureMapDecoder {
     where
         Self: Sized,
     {
-        let dds = create_dds(&self.texture).unwrap();
+        let dds = create_dds(&self.texture).map_err(|e| {
+            ImageError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to read the image: {}", e),
+            ))
+        })?;
         let mut scratch_image = ScratchImage::load_dds(
             dds.as_slice(),
             DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT,
@@ -188,7 +195,7 @@ impl ImageDecoder for TextureMapDecoder {
         if scratch_image.metadata().format == DXGI_FORMAT_R16G16B16A16_FLOAT{
             scratch_image = scratch_image.convert(DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT).map_err(DirectXTexError).unwrap();
         }
-
+        
         let blob = scratch_image
             .image(0, 0, 0)
             .unwrap()
@@ -196,6 +203,13 @@ impl ImageDecoder for TextureMapDecoder {
             .unwrap();
 
         let data = blob.buffer();
+
+        if data.len() < buf.len() {
+            return Err(ImageError::IoError(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!("DDS buffer too small: data has {} bytes, buf needs {}", data.len(), buf.len()),
+            )));
+        }
 
         buf.copy_from_slice(&data[data.len() - buf.len()..]);
 

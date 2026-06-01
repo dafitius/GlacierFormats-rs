@@ -13,25 +13,28 @@ pub mod atlas;
 pub mod image;
 pub mod box_reflection;
 
+#[non_exhaustive]
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum WoaVersion {
+pub enum GlacierGame {
     HM2016,
     HM2,
     HM3,
+    KNT,
 }
 
-impl FromStr for WoaVersion {
+impl FromStr for GlacierGame {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "1" | "H1" | "HM1" | "HM2016" | "H2016" => Ok(WoaVersion::HM2016),
-            "2" | "H2" | "HM2" | "HM2018" | "H2018" => Ok(WoaVersion::HM2),
-            "3" | "H3" | "HM3" | "HM2020" | "H2020" => Ok(WoaVersion::HM3),
-            _ => Err(format!("Invalid value for WoaVersion: {s}")),
+        match s.to_lowercase().as_str() {
+            "1" | "H1" | "HM1" | "HM2016" | "H2016" => Ok(GlacierGame::HM2016),
+            "2" | "H2" | "HM2" | "HM2018" | "H2018" => Ok(GlacierGame::HM2),
+            "3" | "H3" | "HM3" | "HM2020" | "H2020" => Ok(GlacierGame::HM3),
+            "007" | "KNT" | "BOND" | "FIRSTLIGHT" | "B2026" => Ok(GlacierGame::KNT),
+            _ => Err(format!("Invalid value for GlacierGame: {s}")),
         }
     }
 }
 
 pub trait Version {
-    fn get_version() -> WoaVersion;
+    fn get_version() -> GlacierGame;
 }

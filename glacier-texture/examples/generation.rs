@@ -9,7 +9,7 @@ use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use glacier_texture::enums::{InterpretAs, RenderFormat, TextureType};
 use glacier_texture::pack::MipFilter::Linear;
 use glacier_texture::pack::TextureMapBuilder;
-use glacier_texture::WoaVersion;
+use glacier_texture::GlacierGame;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tga_path = PathBuf::from("./target/texture.tga");
     let text_rrid = RuntimeResourceID::from_hex_string("000210D1CF04E4E4")?;
     let texd_rrid = RuntimeResourceID::from_hex_string("00752CEA9F76AB7E")?;
-    let woa_version = WoaVersion::HM3;
+    let glacier_game = GlacierGame::HM3;
 
     let partition_id: PartitionId = "chunk12".parse().unwrap();
     let patch_id: PatchId = PatchId::Patch(5);
@@ -35,17 +35,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .texture_type(TextureType::Colour)
             .with_mip_filter(Linear)
             .with_mipblock1(add_texd)
-            .with_format(RenderFormat::BC1).build(woa_version)?;
+            .with_format(RenderFormat::BC1).build(glacier_game)?;
 
     //Add resources to package
     let mut texture_resource = PackageResourceBuilder::from_memory(
         text_rrid,
         "TEXT",
         texture.pack_to_vec()?,
-        match woa_version {
-            WoaVersion::HM2016 => { Some(12) }
-            WoaVersion::HM2 => { None }
-            WoaVersion::HM3 => { None }
+        match glacier_game {
+            GlacierGame::HM2016 => { Some(12) }
+            GlacierGame::HM2 | 
+            GlacierGame::HM3 | 
+            GlacierGame::KNT => { None }
+            _ => { unimplemented!() }
         },
         true,
     )?;
@@ -56,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let highmip_resource = PackageResourceBuilder::from_memory(
             texd_rrid,
             "TEXD",
-            mipblock1.pack_to_vec(woa_version)?,
+            mipblock1.pack_to_vec(glacier_game)?,
             None,
             false)?;
         texture_resource.with_memory_requirements(0xFFFFFFFF, mipblock1.video_memory_requirement() as u32);
