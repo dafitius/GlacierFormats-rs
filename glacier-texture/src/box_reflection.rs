@@ -33,7 +33,7 @@ pub enum BoxReflectionError {
 
 #[binrw]
 #[derive(Default, Clone, Debug)]
-pub struct BoxReflectionCollection{
+pub struct BoxReflectionCache {
     #[br(temp)]
     #[bw(calc(entries.len() as u32))]
     num_entries: u32,
@@ -41,7 +41,7 @@ pub struct BoxReflectionCollection{
     pub(crate) entries: Vec<BoxReflection>,
 }
 
-impl BoxReflectionCollection {
+impl BoxReflectionCache {
     pub fn num_box_reflections(&self) -> usize {
         self.entries.len()
     }
@@ -287,7 +287,7 @@ impl BoxReflection {
     }
 }
 
-impl BoxReflectionCollection{
+impl BoxReflectionCache {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, BoxReflectionError> {
         let data = fs::read(path).map_err(BoxReflectionError::IoError)?;
         Self::new_inner(&data)
@@ -299,7 +299,7 @@ impl BoxReflectionCollection{
 
     fn new_inner(data: &[u8]) -> Result<Self, BoxReflectionError>{
         let mut stream = Cursor::new(data);
-        BoxReflectionCollection::read_le(&mut stream).map_err(BoxReflectionError::ParsingError)
+        BoxReflectionCache::read_le(&mut stream).map_err(BoxReflectionError::ParsingError)
     }
 
     pub fn pack_to_vec(&self) -> Result<Vec<u8>, BoxReflectionError> {
@@ -349,20 +349,20 @@ impl BoxReflectionCollection{
     }
 }
 
-impl Index<usize> for BoxReflectionCollection {
+impl Index<usize> for BoxReflectionCache {
     type Output = BoxReflection;
     fn index(&self, index: usize) -> &Self::Output {
         &self.entries[index]
     }
 }
 
-impl IndexMut<usize> for BoxReflectionCollection {
+impl IndexMut<usize> for BoxReflectionCache {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.entries[index]
     }
 }
 
-impl<'a> IntoIterator for &'a BoxReflectionCollection {
+impl<'a> IntoIterator for &'a BoxReflectionCache {
     type Item = &'a BoxReflection;
     type IntoIter = slice::Iter<'a, BoxReflection>;
     fn into_iter(self) -> Self::IntoIter {
@@ -370,7 +370,7 @@ impl<'a> IntoIterator for &'a BoxReflectionCollection {
     }
 }
 
-impl<'a> IntoIterator for &'a mut BoxReflectionCollection {
+impl<'a> IntoIterator for &'a mut BoxReflectionCache {
     type Item = &'a mut BoxReflection;
     type IntoIter = slice::IterMut<'a, BoxReflection>;
     fn into_iter(self) -> Self::IntoIter {
@@ -378,7 +378,7 @@ impl<'a> IntoIterator for &'a mut BoxReflectionCollection {
     }
 }
 
-impl<'a> FromIterator<&'a BoxReflection> for BoxReflectionCollection
+impl<'a> FromIterator<&'a BoxReflection> for BoxReflectionCache
 where
     BoxReflection: Clone,
 {
@@ -391,7 +391,7 @@ where
     }
 }
 
-impl FromIterator<BoxReflection> for BoxReflectionCollection {
+impl FromIterator<BoxReflection> for BoxReflectionCache {
     fn from_iter<T: IntoIterator<Item = BoxReflection>>(iter: T) -> Self {
         Self {
             entries: iter.into_iter().collect(),

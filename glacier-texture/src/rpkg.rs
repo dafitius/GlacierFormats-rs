@@ -1,7 +1,7 @@
 use std::io::Cursor;
 use binrw::{BinRead, BinWrite};
 use rpkg_rs::{GlacierResource, GlacierResourceError};
-use crate::box_reflection::{BoxReflectionCollection};
+use crate::box_reflection::{BoxReflectionCache};
 use crate::mipblock::MipblockData;
 use crate::pack::TexturePackerError;
 use crate::texture_map::TextureMap;
@@ -120,11 +120,11 @@ pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionMan
     Ok(texture_map)
 }
 
-impl GlacierResource for BoxReflectionCollection{
-    type Output = BoxReflectionCollection;
+impl GlacierResource for BoxReflectionCache {
+    type Output = BoxReflectionCache;
 
     fn process_data<R: AsRef<[u8]>>(_: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
-        BoxReflectionCollection::from_memory(data.as_ref()).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
+        BoxReflectionCache::from_memory(data.as_ref()).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
     fn serialize(&self, _: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
