@@ -23,6 +23,7 @@ rpkg-rs = { path = "/home/dafitius/Documents/GitHub/rpkg-rs", features = ["path-
 png = "0.18.0"
 image = { version = "0.25.8" , default-features = false, optional = true }
 memmap2 = "0.9.8"
+half = "2.7.1"
 
 [dependencies.glacier-base]
 path = "../glacier-base"

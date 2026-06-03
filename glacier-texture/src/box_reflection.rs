@@ -10,6 +10,7 @@ use crate::image::helpers;
 
 #[cfg(feature = "image")]
 use image::{ColorType, DynamicImage, ExtendedColorType};
+use image::{ImageBuffer, Rgba, Rgba32FImage};
 use glacier_base::math::Vector3;
 pub use cubemap_utils::Orientation;
 
@@ -255,8 +256,51 @@ impl BoxReflection {
     }
 
     #[cfg(feature = "image")]
-    pub fn create_dynamic_image(&mut self, layout: CubemapLayout) -> Result<DynamicImage, BoxReflectionError> {
-        todo!()
+    pub fn create_dynamic_image(
+        &self,
+        layout: CubemapLayout,
+    ) -> Result<DynamicImage, BoxReflectionError> {
+        self.create_dynamic_image_with_rotation(layout, [None, None, None])
+    }
+
+    #[cfg(feature = "image")]
+    pub fn create_dynamic_image_with_rotation(
+        &self,
+        layout: CubemapLayout,
+        rotation: [Option<Orientation>; 3],
+    ) -> Result<DynamicImage, BoxReflectionError> {
+        let cubemap = self.create_cubemap_image(true)?;
+        let scratch = cubemap_utils::compose_layout_with_rotation(
+            &cubemap,
+            layout,
+            rotation,
+        )?;
+
+        let metadata = scratch.metadata();
+        let width = metadata.width;
+        let height = metadata.height;
+
+        let bytes = scratch.pixels();
+
+        let expected_len = width * height * 4 * 2;
+        if bytes.len() != expected_len as usize {
+            return Err(BoxReflectionError::Other(
+                "Failed to parse texture to image format".to_string(),
+            ));
+        }
+
+        let data: Vec<f32> = bytes
+            .chunks_exact(2)
+            .map(|chunk| {
+                let bits = u16::from_le_bytes([chunk[0], chunk[1]]);
+                half::f16::from_bits(bits).to_f32()
+            })
+            .collect();
+
+        let img = Rgba32FImage::from_raw(width as u32, height as u32, data)
+            .ok_or_else(|| BoxReflectionError::Other("Invalid image texture".to_string()))?;
+
+        Ok(DynamicImage::ImageRgba32F(img))
     }
 
     fn create_cubemap_image(&self, decompressed: bool) -> Result<ScratchImage, BoxReflectionError> {

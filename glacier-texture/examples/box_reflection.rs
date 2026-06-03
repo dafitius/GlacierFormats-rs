@@ -24,8 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let layout = CubemapLayout::HorizontalCross;
     
     for (i, boxr) in boxc.iter().take(1).enumerate() {
-        let dec = BoxReflectionDecoder::from_box_reflection(boxr.clone(), layout);
-        let image = DynamicImage::from_decoder(dec)?;
+        let image = boxr.create_dynamic_image(layout)?;
         image.save(out_dir.join( format!("decoded-{}.exr", i)))?;
     }
 
