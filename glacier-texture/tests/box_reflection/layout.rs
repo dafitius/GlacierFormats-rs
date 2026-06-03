@@ -1,10 +1,10 @@
 use std::{slice};
 use std::ptr::NonNull;
 use glacier_texture::box_reflection::{BoxReflection, CubemapLayout};
-use glacier_texture::box_reflection::cubemap_utils::{compose_layout, compose_layout_with_rotation, decompose_layout, Orientation};
-use directxtex::{Image, ScratchImage, DXGI_FORMAT_R16G16B16A16_FLOAT, TGA_FLAGS_NONE, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT};
+use directxtex::{Image, ScratchImage, DXGI_FORMAT_R16G16B16A16_FLOAT, TGA_FLAGS_NONE, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, DDS_FLAGS_NONE};
 use rstest::rstest;
-use glacier_texture::box_reflection::cubemap_utils::Orientation::Rotate270;
+use glacier_base::math::Vector3;
+use glacier_texture::box_reflection::Orientation::*;
 use crate::read_fixture;
 
 #[test]
@@ -15,7 +15,6 @@ fn verify_from_tile_counts() {
     assert_eq!(CubemapLayout::from_tile_counts(3, 4), Some(CubemapLayout::VerticalCross));
     assert_eq!(CubemapLayout::from_tile_counts(2, 2), None);
 }
-
 
 fn layout_fixture(layout: CubemapLayout) -> Vec<u8> {
     match layout {
@@ -29,33 +28,58 @@ fn layout_fixture(layout: CubemapLayout) -> Vec<u8> {
 #[rstest]
 fn verify_converting_layouts(
     #[values(
-        CubemapLayout::HorizontalStrip, CubemapLayout::VerticalStrip,
-        CubemapLayout::HorizontalCross, CubemapLayout::VerticalCross
+        CubemapLayout::HorizontalStrip,
+        CubemapLayout::VerticalStrip,
+        CubemapLayout::HorizontalCross,
+        CubemapLayout::VerticalCross
     )]
     layout: CubemapLayout,
     #[values(
-        CubemapLayout::HorizontalStrip, CubemapLayout::VerticalStrip,
-        CubemapLayout::HorizontalCross, CubemapLayout::VerticalCross
+        CubemapLayout::HorizontalStrip,
+        CubemapLayout::VerticalStrip,
+        CubemapLayout::HorizontalCross,
+        CubemapLayout::VerticalCross
     )]
     expected_layout: CubemapLayout,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut source_dds = ScratchImage::load_tga(&layout_fixture(layout), TGA_FLAGS_NONE, None)?;
-    source_dds = source_dds.convert(DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
-    let mut expected_dds = ScratchImage::load_tga(&layout_fixture(expected_layout), TGA_FLAGS_NONE, None)?;
-    expected_dds = expected_dds.convert(DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT)?;
+    let source_tga = layout_fixture(layout);
+    let expected_tga = layout_fixture(expected_layout);
 
-    let expected_dds = expected_dds.image(0,0,0).unwrap();
+    // Load source fixture and build a BoxReflection through the public API.
+    let source_img = ScratchImage::load_tga(&source_tga, TGA_FLAGS_NONE, None)?;
+    let source_dds = source_img.save_dds(DDS_FLAGS_NONE)?;
+    let box_reflection = BoxReflection::from_dds(source_dds.buffer().to_vec(), Vector3::default())?;
 
-    let source_img = source_dds.image(0, 0, 0).unwrap();
-    // Original -> Cubemap -> other layout
-    let cubemap = decompose_layout(source_img, layout)?;
-    let out_layout_img = compose_layout_with_rotation(&cubemap, expected_layout, [None, None, Some(Rotate270)])?; //rotate to undo standard -90 rotation on z-axis
+    // Export to the requested layout through the public API.
+    let out_dds = box_reflection.create_dds_with_rotation(
+        Some(expected_layout),
+        [None, None, Some(Rotate270)], // undo standard -90 z rotation
+    )?;
+    let out_scratch = ScratchImage::load_dds(&out_dds, DDS_FLAGS_NONE, None, None)?
+        .convert(
+            DXGI_FORMAT_R16G16B16A16_FLOAT,
+            TEX_FILTER_DEFAULT,
+            TEX_THRESHOLD_DEFAULT,
+        )?;
 
-    let out_layout_img = out_layout_img.image(0,0,0).unwrap();
+    // Load expected fixture for comparison.
+    let expected_scratch = ScratchImage::load_tga(&expected_tga, TGA_FLAGS_NONE, None)?
+        .convert(
+            DXGI_FORMAT_R16G16B16A16_FLOAT,
+            TEX_FILTER_DEFAULT,
+            TEX_THRESHOLD_DEFAULT,
+        )?;
 
-    assert_eq!(out_layout_img.width, expected_dds.width);
-    assert_eq!(out_layout_img.height, expected_dds.height);
-    assert_eq!(checksum(image_pixels(&out_layout_img).unwrap().as_slice()), checksum(image_pixels(expected_dds).unwrap().as_slice()));
+    let out_img = out_scratch.image(0, 0, 0).unwrap();
+    let expected_img = expected_scratch.image(0, 0, 0).unwrap();
+
+    assert_eq!(out_img.width, expected_img.width);
+    assert_eq!(out_img.height, expected_img.height);
+    assert_eq!(
+        checksum(image_pixels(out_img).unwrap().as_slice()),
+        checksum(image_pixels(expected_img).unwrap().as_slice())
+    );
+
     Ok(())
 }
 
@@ -74,6 +98,5 @@ pub(crate) fn image_pixels(image: &Image) -> Option<Vec<u8>> {
     let scanlines = image.format.compute_scanlines(image.height);
     let buffer_size = image.row_pitch.checked_mul(scanlines)?;
     let raw_slice = unsafe { slice::from_raw_parts(pixels.as_ptr(), buffer_size) };
-    let raw_buffer = raw_slice.to_vec();
-    Some(raw_buffer)
+    Some(raw_slice.to_vec())
 }

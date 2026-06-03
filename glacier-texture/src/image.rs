@@ -228,7 +228,7 @@ impl ImageDecoder for BoxReflectionDecoder {
         ColorType::Rgba32F
     }
 
-    fn read_image(mut self, buf: &mut [u8]) -> ImageResult<()>
+    fn read_image(self, buf: &mut [u8]) -> ImageResult<()>
     where
         Self: Sized,
     {

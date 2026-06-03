@@ -1,7 +1,7 @@
 use crate::convert::TextureConversionError::DirectXTexError;
 use crate::enums::RenderFormat;
 use crate::texture_map::{MipLevel, TextureMap};
-use directxtex::{HResultError, Image, ScratchImage, TexMetadata, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
+use directxtex::{HResultError, Image, ScratchImage, TexMetadata, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
 use png::ColorType;
 use std::{io, slice};
 use std::io::{BufWriter, Cursor, Write};

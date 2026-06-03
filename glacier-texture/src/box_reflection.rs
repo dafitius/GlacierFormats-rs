@@ -4,14 +4,14 @@ use std::io::{BufWriter, Cursor, Seek, Write};
 use std::ops::{Index, IndexMut};
 use std::path::Path;
 use binrw::{binrw, BinRead, BinWriterExt};
-use directxtex::{HResultError, Image, ScratchImage, CP_FLAGS, CP_FLAGS_NONE, DDS_FLAGS, DDS_FLAGS_NONE, DXGI_FORMAT_BC6H_UF16, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_UNORM, TEX_COMPRESS_DEFAULT, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT};
+use directxtex::{HResultError, Image, ScratchImage, CP_FLAGS, CP_FLAGS_NONE, DDS_FLAGS, DDS_FLAGS_NONE, DXGI_FORMAT_BC6H_UF16, DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_COMPRESS_DEFAULT, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT};
 use crate::convert;
 use crate::image::helpers;
 
 #[cfg(feature = "image")]
 use image::{ColorType, DynamicImage, ExtendedColorType};
 use glacier_base::math::Vector3;
-use crate::box_reflection::cubemap_utils::Orientation;
+pub use cubemap_utils::Orientation;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoxReflectionError {
@@ -38,27 +38,30 @@ pub struct BoxReflectionCache {
     #[bw(calc(entries.len() as u32))]
     num_entries: u32,
     #[br(count = num_entries)]
-    pub(crate) entries: Vec<BoxReflection>,
+    entries: Vec<BoxReflection>,
 }
 
 impl BoxReflectionCache {
-    pub fn num_box_reflections(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.entries.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 
-    pub fn box_reflections(&self) -> &Vec<BoxReflection> {
+    pub fn as_slice(&self) -> &[BoxReflection]{
         &self.entries
     }
 
-    pub fn box_reflections_mut(&mut self) -> &mut Vec<BoxReflection> {
+    pub fn as_mut_slice(&mut self) -> &mut [BoxReflection] {
         &mut self.entries
     }
 
-    pub fn box_reflection(&self, index: usize) -> Option<&BoxReflection> {
+    pub fn get(&self, index: usize) -> Option<&BoxReflection> {
         self.entries.get(index)
     }
 
-    pub fn box_reflection_mut(&mut self, index: usize) -> Option<&mut BoxReflection> {
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut BoxReflection> {
         self.entries.get_mut(index)
     }
 
@@ -85,11 +88,11 @@ impl BoxReflectionCache {
         })
     }
 
-    pub fn box_reflection_at(&self, position: Vector3) -> Option<&BoxReflection> {
+    pub fn get_at_position(&self, position: Vector3) -> Option<&BoxReflection> {
         Self::nearest_by(self.entries.iter(), position)
     }
 
-    pub fn box_reflection_at_mut(&mut self, position: Vector3) -> Option<&mut BoxReflection> {
+    pub fn get_at_position_mut(&mut self, position: Vector3) -> Option<&mut BoxReflection> {
         Self::nearest_by(self.entries.iter_mut(), position)
     }
 }
@@ -104,7 +107,7 @@ pub struct BoxReflection {
     #[bw(calc(buffer.len() as u32))]
     size: u32,
     #[br(count = size)]
-    pub(crate) buffer: Vec<u8>,
+    buffer: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,8 +128,8 @@ impl CubemapLayout{
         ]
     }
 
-    pub fn from_tile_counts(width: usize, height: usize) -> Option<Self> {
-        let dims = (width, height);
+    pub fn from_tile_counts(tiles_x: usize, tiles_y: usize) -> Option<Self> {
+        let dims = (tiles_x, tiles_y);
         Self::variants()
             .iter()
             .copied()
@@ -171,6 +174,10 @@ impl BoxReflection {
         128
     }
 
+    pub(crate) fn buffer_size(&self) -> usize {
+        self.buffer.len()
+    }
+
     #[cfg(feature = "image")]
     pub fn from_dynamic_image(image: &DynamicImage, pos: Vector3) -> Result<Self, BoxReflectionError> {
         let extended_color = match &image.color(){
@@ -196,7 +203,7 @@ impl BoxReflection {
         Self::from_scratch_image(dds, pos)
     }
 
-    pub fn from_scratch_image(scratch_image: ScratchImage, pos: Vector3) -> Result<BoxReflection, BoxReflectionError> {
+    pub(crate) fn from_scratch_image(scratch_image: ScratchImage, pos: Vector3) -> Result<BoxReflection, BoxReflectionError> {
 
         let (w, h) = (scratch_image.metadata().width, scratch_image.metadata().height);
 
@@ -226,11 +233,11 @@ impl BoxReflection {
         }
     }
 
-    pub fn create_dds(&mut self, layout: Option<CubemapLayout>) -> Result<Vec<u8>, BoxReflectionError> {
+    pub fn create_dds(&self, layout: Option<CubemapLayout>) -> Result<Vec<u8>, BoxReflectionError> {
         self.create_dds_with_rotation(layout, [None, None, None])
     }
 
-    pub fn create_dds_with_rotation(&mut self, layout: Option<CubemapLayout>, rotation: [Option<Orientation>; 3]) -> Result<Vec<u8>, BoxReflectionError> {
+    pub fn create_dds_with_rotation(&self, layout: Option<CubemapLayout>, rotation: [Option<Orientation>; 3]) -> Result<Vec<u8>, BoxReflectionError> {
         let cubemap = self.create_cubemap_image(true)?;
         let scratch = match layout {
             None => {cubemap}
@@ -249,17 +256,17 @@ impl BoxReflection {
 
     #[cfg(feature = "image")]
     pub fn create_dynamic_image(&mut self, layout: CubemapLayout) -> Result<DynamicImage, BoxReflectionError> {
-        unimplemented!()
+        todo!()
     }
 
-    fn create_cubemap_image(&mut self, decompressed: bool) -> Result<ScratchImage, BoxReflectionError> {
+    fn create_cubemap_image(&self, decompressed: bool) -> Result<ScratchImage, BoxReflectionError> {
 
         let pitch = DXGI_FORMAT_BC6H_UF16
                     .compute_pitch(Self::tile_width(), Self::tile_height(), CP_FLAGS::CP_FLAGS_NONE)
                     .map_err(BoxReflectionError::DirectXTexError)?;
 
         let face_size = pitch.slice;
-        let base_ptr = self.buffer.as_mut_ptr();
+        let base_ptr = self.buffer.as_ptr();
 
         let images: Vec<(Vec<u8>, Image)> = (0..6).map(|face| {
             let ptr = unsafe { base_ptr.add(face * face_size) };
@@ -328,7 +335,10 @@ impl BoxReflectionCache {
         self.entries.insert(index, br)
     }
 
-    pub fn remove(&mut self, index: usize) -> Option<BoxReflection> {
+    pub fn remove(&mut self, index: usize) -> BoxReflection {
+        self.entries.remove(index)
+    }
+    pub fn try_remove(&mut self, index: usize) -> Option<BoxReflection> {
         if index < self.entries.len() {
             Some(self.entries.remove(index))
         } else {
@@ -399,9 +409,8 @@ impl FromIterator<BoxReflection> for BoxReflectionCache {
     }
 }
 
-pub mod cubemap_utils {
-    use std::ops::Add;
-    use binrw::{BinRead, BinWrite};
+
+mod cubemap_utils {
     use bitfield_struct::bitfield;
     use directxtex::{Rect, ScratchImage, CP_FLAGS_NONE, DXGI_FORMAT_R16G16B16A16_FLOAT, TEX_FILTER_DEFAULT, TEX_FILTER_FLAGS};
     use crate::box_reflection::cubemap_utils::Orientation::{Rotate180, Rotate270, Rotate90};
@@ -415,18 +424,8 @@ pub mod cubemap_utils {
         Rotate270,
     }
 
-    impl Orientation {
-        pub fn degrees(&self) -> usize {
-            match self {
-                Rotate90 => {90}
-                Rotate180 => {180}
-                Rotate270 => {270}
-            }
-        }
-    }
-
     #[bitfield(u8)]
-    pub struct Flip {
+    struct Flip {
         horizontal: bool,
         vertical: bool,
         #[bits(6)]
@@ -450,7 +449,7 @@ pub mod cubemap_utils {
         let mut dst = vec![0u8; dst_len];
         let dst_ptr = dst.as_mut_ptr();
 
-        let rot = rotate.map(|r| r.degrees()).unwrap_or(0);
+        let rot = rotate.map(|r| r.to_deg()).unwrap_or(0);
 
         let map = |x: usize, y: usize| -> (usize, usize) {
             match rot {
@@ -483,11 +482,11 @@ pub mod cubemap_utils {
         }
     }
 
-    pub fn compose_layout(images: &ScratchImage, layout: CubemapLayout) -> Result<ScratchImage, BoxReflectionError> {
+    pub(crate) fn compose_layout(images: &ScratchImage, layout: CubemapLayout) -> Result<ScratchImage, BoxReflectionError> {
         compose_layout_with_rotation(images, layout, [None, None, None])
     }
 
-    pub fn compose_layout_with_rotation(images: &ScratchImage, layout: CubemapLayout, rotation: [Option<Orientation>; 3]) -> Result<ScratchImage, BoxReflectionError> {
+    pub(crate) fn compose_layout_with_rotation(images: &ScratchImage, layout: CubemapLayout, rotation: [Option<Orientation>; 3]) -> Result<ScratchImage, BoxReflectionError> {
 
         if images.metadata().format != DXGI_FORMAT_R16G16B16A16_FLOAT {
             return Err(BoxReflectionError::Other(format!("Invalid format ({:?}), the Image format must be 4-channel half-float", images.metadata().format)))
@@ -543,7 +542,7 @@ pub mod cubemap_utils {
         Ok(scratch_image)
     }
 
-    pub fn decompose_layout(image: &Image, layout: CubemapLayout) -> Result<ScratchImage, BoxReflectionError> {
+    pub(crate) fn decompose_layout(image: &Image, layout: CubemapLayout) -> Result<ScratchImage, BoxReflectionError> {
         let face_w = BoxReflection::tile_width();
         let face_h = BoxReflection::tile_height();
 
@@ -615,27 +614,16 @@ pub mod cubemap_utils {
     }
 
     #[derive(Copy, Clone, Debug)]
-    #[allow(dead_code)] //TODO: add API to set custom rotations
     enum Axis { X, Y, Z }
     type Vec3 = (i8, i8, i8);
 
 
     impl Orientation {
-        pub fn to_deg(&self) -> u16 {
+        fn to_deg(self) -> u16 {
             match self {
                 Rotate90 => 90,
                 Rotate180 => 180,
                 Rotate270 => 270,
-            }
-        }
-
-        pub fn  from_deg(d: u16) -> Orientation {
-            match (d % 360 + 360) % 360 {
-                90 => Rotate90,
-                180 => Rotate180,
-                270 => Rotate270,
-                0 => Rotate90, // unreachable for pure Rotate math (no identity)
-                _ => unreachable!(),
             }
         }
 

@@ -136,7 +136,7 @@ impl GlacierResource for BoxReflectionCache {
     }
 
     fn video_memory_requirement(&self) -> u64 {
-        self.entries.iter().map(|e|e.buffer.len() as u64).sum()
+        self.iter().map(|e|e.buffer_size() as u64).sum()
     }
 
     fn system_memory_requirement(&self) -> u64 {

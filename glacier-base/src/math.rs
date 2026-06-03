@@ -405,6 +405,7 @@ pub struct Vector3 {
 }
 
 impl Vector for Vector3 {
+
     fn add(&self, other: &Self) -> Self {
         Vector3 {
             x: self.x + other.x,
@@ -443,6 +444,24 @@ impl Vector for Vector3 {
             y: self.y.max(other.y),
             z: self.z.max(other.z),
         }
+    }
+}
+
+impl Vector3 {
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
+
+    pub fn from_float(val: f32) -> Self {
+        Self {
+            x: val,
+            y: val,
+            z: val,
+        }
+    }
+
+    pub fn as_slice(&self) -> [f32; 3] {
+        [self.x, self.y, self.z]
     }
 }
 

@@ -18,7 +18,7 @@ use glacier_texture::WoaVersion;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let boxc = BoxReflectionCache::from_file("/path/to/00ABCDEF01234567.BOXC")?;
-    println!("Boxc loaded with {:?} entries", boxc.num_box_reflections());
+    println!("Boxc loaded with {:?} entries", boxc.len());
 
     let out_dir = PathBuf::from("/target/box");
     let layout = CubemapLayout::HorizontalCross;
