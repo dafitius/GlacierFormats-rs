@@ -1,29 +1,31 @@
-use std::io::Cursor;
-use binrw::{BinRead, BinWrite};
-use rpkg_rs::{GlacierResource, GlacierResourceError};
-use crate::box_reflection::{BoxReflectionCache};
+use crate::box_reflection::BoxReflectionCache;
 use crate::mipblock::MipblockData;
 use crate::pack::TexturePackerError;
 use crate::texture_map::TextureMap;
-use crate::WoaVersion;
+use crate::GlacierGame;
+use binrw::{BinRead, BinWrite};
+use rpkg_rs::{GlacierResource, GlacierResourceError};
+use std::io::Cursor;
 
-
-impl From<rpkg_rs::WoaVersion> for WoaVersion {
+impl From<rpkg_rs::WoaVersion> for GlacierGame {
     fn from(value: rpkg_rs::WoaVersion) -> Self {
         match value {
-            rpkg_rs::WoaVersion::HM2016 => { WoaVersion::HM2016 }
-            rpkg_rs::WoaVersion::HM2 => { WoaVersion::HM2 }
-            rpkg_rs::WoaVersion::HM3 => { WoaVersion::HM3 }
+            rpkg_rs::WoaVersion::HM2016 => GlacierGame::HM2016,
+            rpkg_rs::WoaVersion::HM2 => GlacierGame::HM2,
+            rpkg_rs::WoaVersion::HM3 => GlacierGame::HM3,
         }
     }
 }
 
-impl From<WoaVersion> for rpkg_rs::WoaVersion{
-    fn from(value: WoaVersion) -> Self {
+impl From<GlacierGame> for rpkg_rs::WoaVersion {
+    fn from(value: GlacierGame) -> Self {
         match value {
-            WoaVersion::HM2016 => { rpkg_rs::WoaVersion::HM2016 }
-            WoaVersion::HM2 => { rpkg_rs::WoaVersion::HM2 }
-            WoaVersion::HM3 => { rpkg_rs::WoaVersion::HM3 }
+            GlacierGame::HM2016 => rpkg_rs::WoaVersion::HM2016,
+            GlacierGame::HM2 => rpkg_rs::WoaVersion::HM2,
+            GlacierGame::HM3 => rpkg_rs::WoaVersion::HM3,
+            GlacierGame::KNT => {
+                todo!()
+            }
         }
     }
 }
@@ -31,16 +33,21 @@ impl From<WoaVersion> for rpkg_rs::WoaVersion{
 impl GlacierResource for TextureMap {
     type Output = TextureMap;
 
-    fn process_data<R: AsRef<[u8]>>(woa_version: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
+    fn process_data<R: AsRef<[u8]>>(
+        glacier_game: rpkg_rs::WoaVersion,
+        data: R,
+    ) -> Result<Self::Output, GlacierResourceError> {
         let mut stream = Cursor::new(data);
-        TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
+        TextureMap::read_le_args(&mut stream, (GlacierGame::from(glacier_game),))
+            .map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
     fn serialize(&self, _: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
         //TODO: woa version gets ignored currently. Getting the packer to accept TextureMap would allow for easy porting.
         let mut writer = Cursor::new(Vec::new());
         self.write_le_args(&mut writer, ())
-            .map_err(TexturePackerError::SerializationError).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?; //TODO: change this
+            .map_err(TexturePackerError::SerializationError)
+            .map_err(|e| GlacierResourceError::ReadError(e.to_string()))?; //TODO: change this
         Ok(writer.into_inner())
     }
 
@@ -61,27 +68,36 @@ impl GlacierResource for TextureMap {
     }
 
     fn should_compress(&self) -> bool {
-        match self.version(){
-            WoaVersion::HM2016 => {true}
-            WoaVersion::HM2 |
-            WoaVersion::HM3 => {false}
+        match self.version() {
+            GlacierGame::HM2016 => true,
+            GlacierGame::HM2 | GlacierGame::HM3 | GlacierGame::KNT => false,
         }
     }
 }
 
-impl GlacierResource for MipblockData{
+impl GlacierResource for MipblockData {
     type Output = MipblockData;
 
-    fn process_data<R: AsRef<[u8]>>(woa_version: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
-        let mipblock = MipblockData::from_memory(data.as_ref(), woa_version.into()).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+    fn process_data<R: AsRef<[u8]>>(
+        woa_version: rpkg_rs::WoaVersion,
+        data: R,
+    ) -> Result<Self::Output, GlacierResourceError> {
+        let mipblock = MipblockData::from_memory(data.as_ref(), woa_version.into())
+            .map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
         Ok(mipblock)
     }
 
     fn serialize(&self, woa_version: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
-        if self.header.is_empty() && (woa_version == rpkg_rs::WoaVersion::HM2016 || woa_version == rpkg_rs::WoaVersion::HM2) {
-            return Err(GlacierResourceError::ReadError(format!("Cannot serialize to {woa_version:?} without header data :(")));
+        if self.header.is_empty()
+            && (woa_version == rpkg_rs::WoaVersion::HM2016
+                || woa_version == rpkg_rs::WoaVersion::HM2)
+        {
+            return Err(GlacierResourceError::ReadError(format!(
+                "Cannot serialize to {woa_version:?} without header data :("
+            )));
         }
-        self.pack_to_vec(woa_version.into()).map_err( |e| GlacierResourceError::WriteError(format!("Texd packing error: {e}")))
+        self.pack_to_vec(woa_version.into())
+            .map_err(|e| GlacierResourceError::WriteError(format!("Texd packing error: {e}")))
     }
 
     fn resource_type() -> [u8; 4] {
@@ -105,16 +121,30 @@ impl GlacierResource for MipblockData{
     }
 }
 
-pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionManager, woa_version: rpkg_rs::WoaVersion, rrid: rpkg_rs::resource::runtime_resource_id::RuntimeResourceID) -> Result<TextureMap, GlacierResourceError> {
-    let res_info = manager.resource_info_from(&"chunk0".parse().unwrap(), &rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
-    let data = manager.read_resource_from("chunk0".parse().unwrap(), rrid).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+pub fn full_texture(
+    manager: &rpkg_rs::resource::partition_manager::PartitionManager,
+    woa_version: rpkg_rs::WoaVersion,
+    rrid: rpkg_rs::resource::runtime_resource_id::RuntimeResourceID,
+) -> Result<TextureMap, GlacierResourceError> {
+    let res_info = manager
+        .resource_info_from(&"chunk0".parse().unwrap(), &rrid)
+        .map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+    let data = manager
+        .read_resource_from("chunk0".parse().unwrap(), rrid)
+        .map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
 
     let mut stream = Cursor::new(data);
-    let mut texture_map = TextureMap::read_le_args(&mut stream, (WoaVersion::from(woa_version), )).map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
+    let mut texture_map = TextureMap::read_le_args(&mut stream, (GlacierGame::from(woa_version),))
+        .map_err(|e| GlacierResourceError::ReadError(e.to_string()))?;
 
-    if let Some((rrid, _)) = res_info.references().first(){
-        let texd_data = manager.read_resource_from("chunk0".parse().unwrap(), *rrid).map_err(|e| GlacierResourceError::ReadError(format!("Tried to load broken depend: {e}")))?;
-        let mipblock = MipblockData::from_memory(texd_data.as_slice(), woa_version.into()).map_err(|e| GlacierResourceError::ReadError(format!("Failed to read texd: {e}")))?;
+    if let Some((rrid, _)) = res_info.references().first() {
+        let texd_data = manager
+            .read_resource_from("chunk0".parse().unwrap(), *rrid)
+            .map_err(|e| {
+                GlacierResourceError::ReadError(format!("Tried to load broken depend: {e}"))
+            })?;
+        let mipblock = MipblockData::from_memory(texd_data.as_slice(), woa_version.into())
+            .map_err(|e| GlacierResourceError::ReadError(format!("Failed to read texd: {e}")))?;
         texture_map.set_mipblock1(mipblock);
     }
     Ok(texture_map)
@@ -123,12 +153,17 @@ pub fn full_texture(manager: &rpkg_rs::resource::partition_manager::PartitionMan
 impl GlacierResource for BoxReflectionCache {
     type Output = BoxReflectionCache;
 
-    fn process_data<R: AsRef<[u8]>>(_: rpkg_rs::WoaVersion, data: R) -> Result<Self::Output, GlacierResourceError> {
-        BoxReflectionCache::from_memory(data.as_ref()).map_err(|e| GlacierResourceError::ReadError(e.to_string()))
+    fn process_data<R: AsRef<[u8]>>(
+        _: rpkg_rs::WoaVersion,
+        data: R,
+    ) -> Result<Self::Output, GlacierResourceError> {
+        BoxReflectionCache::from_memory(data.as_ref())
+            .map_err(|e| GlacierResourceError::ReadError(e.to_string()))
     }
 
     fn serialize(&self, _: rpkg_rs::WoaVersion) -> Result<Vec<u8>, GlacierResourceError> {
-        self.pack_to_vec().map_err(|e|GlacierResourceError::WriteError(format!("Boxc packing error: {e}")))
+        self.pack_to_vec()
+            .map_err(|e| GlacierResourceError::WriteError(format!("Boxc packing error: {e}")))
     }
 
     fn resource_type() -> [u8; 4] {
@@ -136,7 +171,7 @@ impl GlacierResource for BoxReflectionCache {
     }
 
     fn video_memory_requirement(&self) -> u64 {
-        self.iter().map(|e|e.buffer_size() as u64).sum()
+        self.iter().map(|e| e.buffer_size() as u64).sum()
     }
 
     fn system_memory_requirement(&self) -> u64 {

@@ -1,17 +1,16 @@
+use crate::ini_file::{IniFile, IniFileError, IniFileSection};
+use crate::utils::normalize_path;
+use glacier_base::encryption::xtea::{Xtea, XteaConfig};
+use pathdiff::diff_paths;
 use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::from_utf8;
-use pathdiff::diff_paths;
-use glacier_base::encryption::xtea::Xtea;
-use crate::ini_file::{IniFile, IniFileError, IniFileSection};
-use crate::utils::normalize_path;
 
 pub mod ini_file;
-mod encryption;
 mod utils;
 
-
+/// ID for an INI option by section and option name.
 pub struct IniKey {
     pub(crate) section: String,
     pub(crate) option: String,
@@ -19,22 +18,34 @@ pub struct IniKey {
 
 impl IniKey {
     pub fn from_tuple(section: &str, option: &str) -> Self {
-        Self{
+        Self {
             section: section.to_string(),
             option: option.to_string(),
         }
     }
-    pub fn from_path(path: &str) -> Self {
-        match path.split_once("/"){
-            Some((section, option)) => Self{section: section.to_string(), option: option.to_string() },
-            None => Self{ section: "".to_string(), option: path.to_string() },
+
+    /// Creates a new [IniKey] from a `section/option` path string
+    //
+    /// ### examples:
+    /// - application/scene_file => section: "application", option: "scene_file"
+    /// - scene_file => section: "", option: "scene_file"
+    pub fn from_location(path: &str) -> Self {
+        match path.split_once("/") {
+            Some((section, option)) => Self {
+                section: section.to_string(),
+                option: option.to_string(),
+            },
+            None => Self {
+                section: "".to_string(),
+                option: path.to_string(),
+            },
         }
     }
 }
 
 impl From<&str> for IniKey {
     fn from(path: &str) -> Self {
-        IniKey::from_path(path)
+        IniKey::from_location(path)
     }
 }
 
@@ -72,27 +83,37 @@ pub struct IniFileSystem {
 
 impl IniFileSystem {
     pub fn new(ini_file: IniFile) -> Self {
-        Self {
-            root: ini_file,
-        }
+        Self { root: ini_file }
     }
 
-    pub fn from_path(root_file: impl AsRef<Path>) -> Result<Self, IniFileError> {
+    /// Loads an [`IniFileSystem`] from a root file on disk.
+    ///
+    /// The file is read from `root_file` and decrypted using the provided
+    /// [`XteaConfig`], parsed as an [`IniFile`], and any `!include` directives
+    /// are resolved recursively relative to the root file's parent directory.
+    pub fn from_path(
+        root_file: impl AsRef<Path>,
+        xtea_config: XteaConfig,
+    ) -> Result<Self, IniFileError> {
         let ini_file = Self::load_from_path(
             root_file.as_ref(),
             PathBuf::from(root_file.as_ref()).parent().unwrap(),
+            &Xtea::new(xtea_config),
         )?;
-        Ok(Self{
-            root: ini_file
-        })
+        Ok(Self { root: ini_file })
     }
 
-    fn load_from_path(path: &Path, working_directory: &Path) -> Result<IniFile, IniFileError> {
+    fn load_from_path(
+        path: &Path,
+        working_directory: &Path,
+        xtea: &Xtea,
+    ) -> Result<IniFile, IniFileError> {
         let content = fs::read(path).map_err(IniFileError::IoError)?;
         let mut content_decrypted = from_utf8(content.as_ref()).unwrap_or("").to_string();
-        if Xtea::is_encrypted_text_file(&content) {
-            content_decrypted =
-                Xtea::decrypt_text_file(&content).map_err(IniFileError::DecryptionError)?;
+        if xtea.is_encrypted_text_file(&content) {
+            content_decrypted = xtea
+                .decrypt_text_file(&content)
+                .map_err(IniFileError::DecryptionError)?;
         }
 
         let ini_file_name = match diff_paths(path, working_directory) {
@@ -103,6 +124,7 @@ impl IniFileSystem {
             ini_file_name.as_str(),
             content_decrypted.as_str(),
             working_directory,
+            xtea,
         )
     }
 
@@ -110,6 +132,7 @@ impl IniFileSystem {
         name: &str,
         ini_file_content: &str,
         working_directory: &Path,
+        xtea: &Xtea,
     ) -> Result<IniFile, IniFileError> {
         let mut active_section: String = "None".to_string();
         let mut ini_file = IniFile::new(name);
@@ -126,6 +149,7 @@ impl IniFileSystem {
                         let include = Self::load_from_path(
                             working_directory.join(value).as_path(),
                             working_directory,
+                            xtea,
                         )?;
                         ini_file.includes.push(include);
                     }
@@ -154,14 +178,30 @@ impl IniFileSystem {
         Ok(ini_file)
     }
 
-    pub fn write_to_folder<P: AsRef<Path>>(&self, path: P) -> Result<(), IniFileError> {
+    /// Writes the entire [`IniFileSystem`] to a folder on disk.
+    ///
+    /// The root file and all included files are written recursively, preserving
+    /// their relative paths. Output is encrypted with the provided
+    /// [`XteaConfig`].
+    ///
+    /// If `path` points to a file, its parent directory is used as the export root.
+    /// If you don't want multiple included ini files in the export path you should consider using the normalize function first first
+    pub fn write_to_folder<P: AsRef<Path>>(
+        &self,
+        path: P,
+        xtea_config: XteaConfig,
+    ) -> Result<(), IniFileError> {
         let mut folder = path.as_ref();
         if folder.is_file() {
             folder = path.as_ref().parent().ok_or(IniFileError::InvalidInput(
                 "The export path cannot be empty".to_string(),
             ))?;
         }
-        fn write_children_to_folder(path: &Path, ini_file: &IniFile) -> Result<(), IniFileError> {
+        fn write_children_to_folder(
+            path: &Path,
+            ini_file: &IniFile,
+            xtea: &Xtea,
+        ) -> Result<(), IniFileError> {
             let mut file_path = path.join(&ini_file.name);
             file_path = normalize_path(&file_path);
 
@@ -175,10 +215,10 @@ impl IniFileSystem {
                 .create(true)
                 .truncate(true)
                 .open(&file_path)?;
-            ini_file.write_to_file(&mut writer)?;
+            ini_file.write_to_file(&mut writer, xtea)?;
 
             for include in ini_file.includes.iter() {
-                match write_children_to_folder(parent_dir, include) {
+                match write_children_to_folder(parent_dir, include, xtea) {
                     Ok(_) => {}
                     Err(e) => return Err(e),
                 };
@@ -186,10 +226,14 @@ impl IniFileSystem {
             Ok(())
         }
 
-        write_children_to_folder(folder, &self.root)
+        write_children_to_folder(folder, &self.root, &Xtea::new(xtea_config))
     }
 
-    /// Normalizes the IniFileSystem by merging sections and console commands from included files into the root file.
+    /// Normalizes the [`IniFileSystem`] by merging all included files into the root file.
+    ///
+    /// Sections and console commands from included files are applied breadth-first.
+    /// When an option already exists in the root, later values overwrite earlier ones.
+    /// Included files are removed from the hierarchy as part of normalization.
     pub fn normalize(&mut self) {
         let mut queue: VecDeque<IniFile> = VecDeque::new();
         for include in self.root.includes.drain(0..) {
@@ -250,7 +294,9 @@ impl IniFileSystem {
         let mut latest_value: Option<String> = None;
 
         while let Some(current_file) = queue.pop_front() {
-            if let Ok(value) = current_file.get_option(&key.clone().into().section, &key.clone().into().option) {
+            if let Ok(value) =
+                current_file.get_option(&key.clone().into().section, &key.clone().into().option)
+            {
                 // Update the latest value found
                 latest_value = Some(value.clone());
             }
@@ -260,7 +306,8 @@ impl IniFileSystem {
         }
 
         // Return the latest value found or an error if none
-        latest_value.ok_or_else(|| IniFileError::OptionNotFound(key.clone().into().option.to_string()))
+        latest_value
+            .ok_or_else(|| IniFileError::OptionNotFound(key.clone().into().option.to_string()))
     }
 
     /// Retrieves a reference to the root IniFile of the IniFileSystem.

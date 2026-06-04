@@ -1,5 +1,5 @@
-use core::mem::size_of;
 use binrw::binrw;
+use core::mem::size_of;
 use serde::{Deserialize, Serialize};
 
 /// Represents a vertex in a tile polygon, used in atlas data.
@@ -48,7 +48,7 @@ impl AtlasData {
     }
 
     /// Iterates over all tiles, yielding (column, row, &[TilePolygonVertex]).
-    pub fn iter_tiles(&self) -> impl Iterator<Item=(u32, u32, &[TilePolygonVertex])> + '_ {
+    pub fn iter_tiles(&self) -> impl Iterator<Item = (u32, u32, &[TilePolygonVertex])> + '_ {
         self.polygon_vertices
             .chunks(self.polygon_vertex_count())
             .enumerate()
@@ -58,8 +58,6 @@ impl AtlasData {
                 (column, row, vertices)
             })
     }
-
-
 
     pub fn new_grid(width: u32, height: u32) -> Self {
         let polygon_vertex_count = 4;
@@ -71,7 +69,6 @@ impl AtlasData {
 
         for row in 0..height {
             for col in 0..width {
-
                 let vertices = [
                     // top-left vertex
                     TilePolygonVertex {

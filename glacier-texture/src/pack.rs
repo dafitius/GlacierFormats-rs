@@ -4,9 +4,9 @@ use crate::mipblock::MipblockData;
 use crate::pack::TexturePackerError::{DirectXTexError, PackingError};
 use crate::texture_map::{
     TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3,
-    TextureMapInner,
+    TextureMapHeaderV4, TextureMapInner,
 };
-use crate::{convert, WoaVersion};
+use crate::{convert, GlacierGame};
 use directxtex::{
     Image, ScratchImage, DDS_FLAGS, DXGI_FORMAT, TEX_COMPRESS_FLAGS, TEX_FILTER_FLAGS,
     TEX_THRESHOLD_DEFAULT, TGA_FLAGS,
@@ -15,8 +15,8 @@ use directxtex::{
 use image::DynamicImage;
 use lz4::block::CompressionMode;
 use std::cmp::max;
+use std::io;
 use std::io::{Cursor, Read};
-use std::{io};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -357,7 +357,7 @@ impl TextureMapBuilder {
     }
 
     /// Final build method to create a TextureMap.
-    pub fn build(self, woa_version: WoaVersion) -> Result<TextureMap, TexturePackerError> {
+    pub fn build(self, glacier_game: GlacierGame) -> Result<TextureMap, TexturePackerError> {
         let width = self.image.metadata().width as u16;
         let height = self.image.metadata().height as u16;
 
@@ -381,22 +381,22 @@ impl TextureMapBuilder {
         };
 
         // if cfg!(windows) {
-            filter |= TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC;
+        filter |= TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC;
         // }
 
         let mut image = self.image;
-        if image.metadata().format.is_compressed(){
+        if image.metadata().format.is_compressed() {
             image = directxtex::decompress(
                 image.images(),
                 image.metadata(),
                 match image.metadata().format {
-                    DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM |
-                    DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM |
-                    DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM |
-                    DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => {DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM}
-                    DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM => { DXGI_FORMAT::DXGI_FORMAT_A8_UNORM}
-                    DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM => {DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM}
-                    _ => DXGI_FORMAT::DXGI_FORMAT_UNKNOWN
+                    DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM
+                    | DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM
+                    | DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM
+                    | DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
+                    DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM => DXGI_FORMAT::DXGI_FORMAT_A8_UNORM,
+                    DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM => DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM,
+                    _ => DXGI_FORMAT::DXGI_FORMAT_UNKNOWN,
                 },
             )?;
         }
@@ -431,7 +431,7 @@ impl TextureMapBuilder {
 
         let mut data = Self::serialize_mipmaps(&image, generated_mip_levels)?;
         let mut compressed_mip_sizes = mip_sizes;
-        if woa_version == WoaVersion::HM3 {
+        if glacier_game == GlacierGame::HM3 {
             let mut compressed_image_buffer = vec![];
             let mut cursor = Cursor::new(&data);
             for mip in 0..generated_mip_levels as usize {
@@ -476,8 +476,8 @@ impl TextureMapBuilder {
             TextureData::Tex(data)
         };
 
-        let texture_map_inner = match woa_version {
-            WoaVersion::HM2016 => {
+        let texture_map_inner = match glacier_game {
+            GlacierGame::HM2016 => {
                 let header = TextureMapHeaderV1 {
                     type_: self.params.texture_type,
                     texd_identifier: self.params.texd_identifier,
@@ -487,7 +487,9 @@ impl TextureMapBuilder {
                     flags: TextureFlagsInner::default(), //detached from builder
                     width,
                     height,
-                    format: self.params.format,
+                    format: WoaRenderFormat {
+                        format: self.params.format,
+                    },
                     num_mip_levels,
                     default_mip_level: self.params.default_mip_level,
                     interpret_as: self.params.interpret_as,
@@ -502,7 +504,7 @@ impl TextureMapBuilder {
                 }
                 .into()
             }
-            WoaVersion::HM2 => {
+            GlacierGame::HM2 => {
                 let header = TextureMapHeaderV2 {
                     type_: self.params.texture_type,
                     texd_identifier: self.params.texd_identifier,
@@ -512,7 +514,9 @@ impl TextureMapBuilder {
                     flags: TextureFlagsInner::default(), //detached from builder
                     width,
                     height,
-                    format: self.params.format,
+                    format: WoaRenderFormat {
+                        format: self.params.format,
+                    },
                     num_mip_levels,
                     default_mip_level: max(self.params.default_mip_level, 1), //H2 crashes with index 0
                     mip_sizes,
@@ -526,13 +530,39 @@ impl TextureMapBuilder {
                 }
                 .into()
             }
-            WoaVersion::HM3 => {
+            GlacierGame::HM3 => {
                 let header = TextureMapHeaderV3 {
                     type_: self.params.texture_type,
                     flags: self.params.flags,
                     width,
                     height,
-                    format: self.params.format,
+                    format: WoaRenderFormat {
+                        format: self.params.format,
+                    },
+                    num_mip_levels,
+                    default_mip_level: self.params.default_mip_level,
+                    interpret_as: self.params.interpret_as,
+                    dimensions: self.params.dimensions,
+                    mip_sizes,
+                    compressed_mip_sizes,
+                    has_atlas: self.atlas_data.is_some(),
+                };
+                TextureMapInner {
+                    header,
+                    atlas_data: self.atlas_data,
+                    data: texture_data,
+                }
+                .into()
+            }
+            GlacierGame::KNT => {
+                let header = TextureMapHeaderV4 {
+                    type_: self.params.texture_type,
+                    flags: self.params.flags,
+                    width,
+                    height,
+                    format: BondRenderFormat {
+                        format: self.params.format,
+                    },
                     num_mip_levels,
                     default_mip_level: self.params.default_mip_level,
                     interpret_as: self.params.interpret_as,

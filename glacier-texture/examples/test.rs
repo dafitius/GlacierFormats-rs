@@ -1,21 +1,15 @@
-use std::fs;
-use std::io::Cursor;
-use std::path::PathBuf;
-use image::ImageFormat;
-use rpkg_rs::resource::package_builder::{PackageBuilder, PackageResourceBuilder};
-use rpkg_rs::resource::pdefs::PartitionId;
-use rpkg_rs::resource::resource_package::{PackageVersion, ReferenceType, ResourceReferenceFlags, ResourceReferenceFlagsStandard};
-use rpkg_rs::resource::resource_partition::PatchId;
-use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use glacier_texture::texture_map::TextureMap;
-use glacier_texture::WoaVersion;
+use glacier_texture::GlacierGame;
+use image::ImageFormat;
+use std::fs;
+use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Parameters
     // let r8_path = PathBuf::from("D:\\David\\Hitman-modding\\temp\\0018941C98370007.TEXT");
     let r16_path = PathBuf::from("/media/dafitius/980 PRO/HitmanProjects/tmp/000B1BC3C75B15D9.TEXT");
-    let woa_version = WoaVersion::HM3;
+    let woa_version = GlacierGame::HM3;
 
 
     //Create texture from tga

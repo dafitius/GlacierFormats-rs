@@ -1,18 +1,20 @@
 use crate::convert::TextureConversionError::DirectXTexError;
 use crate::enums::RenderFormat;
 use crate::texture_map::{MipLevel, TextureMap};
-use directxtex::{HResultError, Image, ScratchImage, TexMetadata, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
+use directxtex::{
+    HResultError, Image, ScratchImage, TexMetadata, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT,
+    TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS,
+};
 use png::ColorType;
-use std::{io, slice};
 use std::io::{BufWriter, Cursor, Write};
 use std::ptr::NonNull;
+use std::{io, slice};
 use thiserror::Error;
 
 #[cfg(feature = "image")]
 use crate::image::TextureMapDecoder;
 #[cfg(feature = "image")]
 use image::{DynamicImage, ImageResult};
-
 
 #[derive(Error, Debug)]
 pub enum TextureConversionError {
@@ -90,7 +92,6 @@ pub fn create_dds(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
     Ok(Vec::from(blob.buffer()))
 }
 
-
 /// Converts a `TextureMap` into a TGA (Targa) image file.
 /// # Warning
 /// The TGA format does **not** support 16-bit per channel formats such as `R16G16B16A16`.
@@ -122,7 +123,8 @@ pub fn create_png(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
         DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT,
         None,
         None,
-    ).map_err(DirectXTexError)?;
+    )
+    .map_err(DirectXTexError)?;
 
     let buf = Vec::new();
     let cursor = Cursor::new(buf);
@@ -178,7 +180,8 @@ pub(crate) fn decompress_dds(
     scratch_image: ScratchImage,
 ) -> Result<ScratchImage, TextureConversionError> {
     let mut scratch_image = scratch_image;
-    if tex.format().is_compressed() { //We can safely assume a compressed texture to never be 16-bit HDR
+    if tex.format().is_compressed() {
+        //We can safely assume a compressed texture to never be 16-bit HDR
         scratch_image = directxtex::decompress(
             scratch_image.images(),
             scratch_image.metadata(),
@@ -215,8 +218,9 @@ pub(crate) fn decompress_dds(
     Ok(scratch_image)
 }
 
-pub(crate) fn ensure_8bit_colors(scratch_image: &mut ScratchImage) -> Result<(), TextureConversionError> {
-
+pub(crate) fn ensure_8bit_colors(
+    scratch_image: &mut ScratchImage,
+) -> Result<(), TextureConversionError> {
     if scratch_image.metadata().format == DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_FLOAT {
         *scratch_image = directxtex::convert(
             scratch_image.images(),
@@ -224,7 +228,8 @@ pub(crate) fn ensure_8bit_colors(scratch_image: &mut ScratchImage) -> Result<(),
             DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
             TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC,
             TEX_THRESHOLD_DEFAULT,
-        ).map_err(DirectXTexError)?;
+        )
+        .map_err(DirectXTexError)?;
     }
     Ok(())
 }

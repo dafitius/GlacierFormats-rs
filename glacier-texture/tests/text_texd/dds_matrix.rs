@@ -1,50 +1,62 @@
-use std::fs;
-use std::io::Cursor;
+use crate::read_fixture;
 use binrw::BinRead;
-use directxtex::{convert, DDS_FLAGS, DXGI_FORMAT, TEX_FILTER_DEFAULT, TGA_FLAGS};
-use image::ImageFormat;
+use directxtex::{DDS_FLAGS, DXGI_FORMAT, TEX_FILTER_DEFAULT, TGA_FLAGS};
 use glacier_texture::enums::{InterpretAs, RenderFormat, TextureType};
 use glacier_texture::mipblock::MipblockData;
 use glacier_texture::pack::{MipFilter, MipLevels, TextureMapBuilder};
 use glacier_texture::texture_map::TextureMap;
-use glacier_texture::WoaVersion;
+use glacier_texture::GlacierGame;
+use image::ImageFormat;
 use rstest::rstest;
-use crate::read_fixture;
+use std::io::Cursor;
 
-fn load_dds(bytes: &[u8]) -> Result<directxtex::ScratchImage , Box<dyn std::error::Error>> {
-    directxtex::ScratchImage::load_dds(bytes, DDS_FLAGS::DDS_FLAGS_NONE, None, None).map_err(Into::into)
+fn load_dds(bytes: &[u8]) -> Result<directxtex::ScratchImage, Box<dyn std::error::Error>> {
+    directxtex::ScratchImage::load_dds(bytes, DDS_FLAGS::DDS_FLAGS_NONE, None, None)
+        .map_err(Into::into)
 }
 
-fn decompress_if_needed(image: directxtex::ScratchImage) -> Result<directxtex::ScratchImage , Box<dyn std::error::Error>> {
+fn decompress_if_needed(
+    image: directxtex::ScratchImage,
+) -> Result<directxtex::ScratchImage, Box<dyn std::error::Error>> {
     if !image.metadata().format.is_compressed() {
         return Ok(image);
     }
 
     image
         .decompress(match image.metadata().format {
-            DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM |
-            DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM |
-            DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM |
-            DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
+            DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM
+            | DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM
+            | DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM
+            | DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
             DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM => DXGI_FORMAT::DXGI_FORMAT_A8_UNORM,
             DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM => DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM,
             _ => DXGI_FORMAT::DXGI_FORMAT_UNKNOWN,
-        }).map_err(Into::into)
+        })
+        .map_err(Into::into)
 }
 
-//TODO: omit this function for R16G16B16A16
-fn convert_to_rgba8_if_needed(image: directxtex::ScratchImage) -> Result<directxtex::ScratchImage , Box<dyn std::error::Error>>  {
+fn convert_to_rgba8_if_needed(
+    image: directxtex::ScratchImage,
+) -> Result<directxtex::ScratchImage, Box<dyn std::error::Error>> {
     if image.metadata().format == DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM {
         return Ok(image);
     }
 
-    image.convert(DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM, TEX_FILTER_DEFAULT, 0.5)
+    image
+        .convert(
+            DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
+            TEX_FILTER_DEFAULT,
+            0.5,
+        )
         .map_err(Into::into)
 }
 
-fn to_tga(image: &directxtex::ScratchImage) -> Result<image::DynamicImage , Box<dyn std::error::Error>> {
+fn to_tga(
+    image: &directxtex::ScratchImage,
+) -> Result<image::DynamicImage, Box<dyn std::error::Error>> {
     let tga_buffer = image
-        .image(0, 0, 0).unwrap()
+        .image(0, 0, 0)
+        .unwrap()
         .save_tga(TGA_FLAGS::TGA_FLAGS_NONE, None)?;
 
     image::load_from_memory_with_format(tga_buffer.buffer(), ImageFormat::Tga).map_err(Into::into)
@@ -64,7 +76,7 @@ fn to_tga(image: &directxtex::ScratchImage) -> Result<image::DynamicImage , Box<
 pub fn dds_packing_text_texd(
     #[case] source_path: &str,
     #[case] source_format: RenderFormat,
-    #[values(WoaVersion::HM2016, WoaVersion::HM2, WoaVersion::HM3)] game_version: WoaVersion,
+    #[values(GlacierGame::HM2016, GlacierGame::HM2, GlacierGame::HM3)] game_version: GlacierGame,
     #[values(MipLevels::All, MipLevels::Limit(2))] mip_mode: MipLevels,
     #[values(true, false)] texd_mode: bool,
     #[values(true, false)] read_texd: bool,
@@ -86,16 +98,13 @@ pub fn dds_packing_text_texd(
 
     if read_texd {
         if let Some(mipblock) = texture.mipblock1() {
-            let texd = mipblock
-                .pack_to_vec(game_version)?;
-            let block =
-                MipblockData::from_memory(&texd, game_version)?;
+            let texd = mipblock.pack_to_vec(game_version)?;
+            let block = MipblockData::from_memory(&texd, game_version)?;
             texture_map.set_mipblock1(block);
         }
     }
 
-    let rebuilt_dds =
-        glacier_texture::convert::create_dds(&mut texture_map)?;
+    let rebuilt_dds = glacier_texture::convert::create_dds(&mut texture_map)?;
 
     let dynamic_dds = load_dds(&dds_old)?;
     let dynamic_rebuilt_dds = load_dds(&rebuilt_dds)?;
