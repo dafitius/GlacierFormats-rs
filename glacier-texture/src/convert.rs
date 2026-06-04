@@ -1,13 +1,11 @@
 use crate::convert::TextureConversionError::DirectXTexError;
 use crate::enums::RenderFormat;
 use crate::texture_map::{MipLevel, TextureMap};
-use directxtex::{
-    HResultError, Image, ScratchImage, TexMetadata, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT,
-    TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS,
-};
+use directxtex::{HResultError, Image, ScratchImage, TexMetadata, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT, TGA_FLAGS};
 use png::ColorType;
-use std::io;
+use std::{io, slice};
 use std::io::{BufWriter, Cursor, Write};
+use std::ptr::NonNull;
 use thiserror::Error;
 
 #[cfg(feature = "image")]
@@ -107,6 +105,7 @@ pub fn create_tga(tex: &TextureMap) -> Result<Vec<u8>, TextureConversionError> {
     )
     .map_err(DirectXTexError)?;
     scratch_image = decompress_dds(tex, scratch_image)?;
+    ensure_8bit_colors(&mut scratch_image)?;
     let blob = scratch_image
         .image(0, 0, 0)
         .unwrap()
@@ -179,7 +178,7 @@ pub(crate) fn decompress_dds(
     scratch_image: ScratchImage,
 ) -> Result<ScratchImage, TextureConversionError> {
     let mut scratch_image = scratch_image;
-    if tex.format().is_compressed() {
+    if tex.format().is_compressed() { //We can safely assume a compressed texture to never be 16-bit HDR
         scratch_image = directxtex::decompress(
             scratch_image.images(),
             scratch_image.metadata(),
@@ -191,17 +190,6 @@ pub(crate) fn decompress_dds(
             },
         )
         .map_err(DirectXTexError)?
-    }
-
-    if tex.format() == RenderFormat::R16G16B16A16 {
-        scratch_image = directxtex::convert(
-            scratch_image.images(),
-            scratch_image.metadata(),
-            DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
-            TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC,
-            TEX_THRESHOLD_DEFAULT,
-        )
-        .map_err(DirectXTexError)?;
     }
 
     //generate missing blue channel
@@ -225,6 +213,29 @@ pub(crate) fn decompress_dds(
         }
     }
     Ok(scratch_image)
+}
+
+pub(crate) fn ensure_8bit_colors(scratch_image: &mut ScratchImage) -> Result<(), TextureConversionError> {
+
+    if scratch_image.metadata().format == DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_FLOAT {
+        *scratch_image = directxtex::convert(
+            scratch_image.images(),
+            scratch_image.metadata(),
+            DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
+            TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC,
+            TEX_THRESHOLD_DEFAULT,
+        ).map_err(DirectXTexError)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn image_pixels(image: &Image) -> Option<Vec<u8>> {
+    let pixels = NonNull::new(image.pixels)?;
+    let scanlines = image.format.compute_scanlines(image.height);
+    let buffer_size = image.row_pitch.checked_mul(scanlines)?;
+    let raw_slice = unsafe { slice::from_raw_parts(pixels.as_ptr(), buffer_size) };
+    let raw_buffer = raw_slice.to_vec();
+    Some(raw_buffer)
 }
 
 pub fn create_mip_dds(

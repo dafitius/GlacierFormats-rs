@@ -16,10 +16,8 @@ use image::DynamicImage;
 use lz4::block::CompressionMode;
 use std::cmp::max;
 use std::io::{Cursor, Read};
-use std::ptr::NonNull;
-use std::{io, slice};
+use std::{io};
 use thiserror::Error;
-use crate::convert::decompress_dds;
 
 #[derive(Debug, Error)]
 pub enum TexturePackerError {
@@ -201,7 +199,7 @@ impl TextureMapBuilder {
 
     #[cfg(feature = "image")]
     pub fn from_dynamic_image(image: DynamicImage) -> Result<Self, TexturePackerError> {
-        let scratch_image = crate::image::dynamic_image_to_scratch_image(
+        let scratch_image = crate::image::helpers::dynamic_image_to_scratch_image(
             image.as_bytes(),
             image.width(),
             image.height(),
@@ -556,12 +554,7 @@ impl TextureMapBuilder {
     }
 
     fn process_mip_image(mip_image: &Image) -> Option<Vec<u8>> {
-        let pixels = NonNull::new(mip_image.pixels)?;
-        let scanlines = mip_image.format.compute_scanlines(mip_image.height);
-        let buffer_size = mip_image.row_pitch.checked_mul(scanlines)?;
-        let raw_slice = unsafe { slice::from_raw_parts(pixels.as_ptr(), buffer_size) };
-        let raw_buffer = raw_slice.to_vec();
-        Some(raw_buffer)
+        convert::image_pixels(mip_image)
     }
 
     fn serialize_mipmaps(

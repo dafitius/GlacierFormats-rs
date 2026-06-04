@@ -6,12 +6,13 @@ use crate::mipblock::MipblockData;
 use crate::pack::{TextureMapBuilder, TextureMapParameters, TexturePackerError};
 use crate::texture_map::{TextureMap};
 use crate::WoaVersion;
-use binrw::BinRead;
-use directxtex::{HResultError, ScratchImage, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, TEX_FILTER_FLAGS};
+use binrw::{BinRead};
+use directxtex::{HResultError, ScratchImage, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT};
 use image::error::{EncodingError, ImageFormatHint};
 use image::{ColorType, ExtendedColorType, ImageDecoder, ImageEncoder, ImageError, ImageResult};
 use std::io::{BufRead, Seek, Write};
 use thiserror::Error;
+use crate::box_reflection::{BoxReflection, BoxReflectionError, CubemapLayout};
 
 #[derive(Debug, Error)]
 pub enum TextureMapEncodeError {
@@ -68,7 +69,7 @@ impl<TW: Write, DW: Write> ImageEncoder for TextureMapEncoder<TW, DW> {
         height: u32,
         color_type: ExtendedColorType,
     ) -> ImageResult<()> {
-        let scratch_image = dynamic_image_to_scratch_image(buf, width, height, color_type)?;
+        let scratch_image = helpers::dynamic_image_to_scratch_image(buf, width, height, color_type)?;
         let mut builder = TextureMapBuilder::from_scratch_image(scratch_image)
             .map_err(TextureMapEncodeError::Packer)?;
 
@@ -100,43 +101,28 @@ impl<TW: Write, DW: Write> ImageEncoder for TextureMapEncoder<TW, DW> {
     }
 }
 
-pub fn dynamic_image_to_scratch_image(buf: &[u8], width: u32, height: u32, color_type: ExtendedColorType) -> Result<ScratchImage, TextureMapEncodeError> {
-    let dxgi_format = helpers::color_type_to_dxgi(color_type)
-        .ok_or(TextureMapEncodeError::DxgiConversion(color_type))?;
-    let slice_pitch = dxgi_format
-        .compute_pitch(width as usize, height as usize, CP_FLAGS::CP_FLAGS_NONE)
-        .map_err(TextureMapEncodeError::DirectXTexError)?;
-
-    let width = width as usize;
-    let height = height as usize;
-
-    let maybe_converted;
-    let pixels = match color_type {
-        ExtendedColorType::Rgb8 | ExtendedColorType::Bgr8 => {
-            maybe_converted = Some(helpers::rgb8_to_rgba8(buf));
-            maybe_converted.as_ref().unwrap().as_ptr() as *mut u8
-        }
-        ExtendedColorType::Rgb16 => {
-            maybe_converted = Some(helpers::rgb16_to_rgba16(buf));
-            maybe_converted.as_ref().unwrap().as_ptr() as *mut u8
-        }
-        _ => buf.as_ptr() as *mut u8,
-    };
-
-    let image = directxtex::Image {
-        width,
-        height,
-        format: dxgi_format,
-        row_pitch: slice_pitch.row,
-        slice_pitch: slice_pitch.slice,
-        pixels,
-    };
-
-    image
-        .resize(width, height, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT | TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC)
-        .map_err(TextureMapEncodeError::DirectXTexError)
+#[derive(Debug, Error)]
+pub enum BoxReflectionEncodeError {
+    #[error("DXGI conversion failed for color type {0:?}")]
+    DxgiConversion(ExtendedColorType),
+    #[error("Failed DirectXTex operation {0}")]
+    DirectXTexError(#[from] HResultError),
+    #[error("Failed to pack box reflection")]
+    BoxReflection(#[from] BoxReflectionError),
+    #[error("IO error {0}")]
+    IOError(#[from] std::io::Error),
+    #[error("Binrw error {0}")]
+    Binrw(#[from] binrw::Error),
 }
 
+impl From<BoxReflectionEncodeError> for ImageError {
+    fn from(e: BoxReflectionEncodeError) -> Self {
+        ImageError::Encoding(EncodingError::new(
+            ImageFormatHint::Name("BoxReflection".to_owned()),
+            e.to_string(),
+        ))
+    }
+}
 
 pub struct TextureMapDecoder {
     texture: TextureMap,
@@ -170,7 +156,7 @@ impl ImageDecoder for TextureMapDecoder {
 
     fn color_type(&self) -> ColorType {
         match self.texture.format() {
-            RenderFormat::R16G16B16A16 => ColorType::Rgba16,
+            RenderFormat::R16G16B16A16 => ColorType::Rgba32F,
             RenderFormat::R8G8B8A8 => ColorType::Rgba8,
             RenderFormat::R8G8 => ColorType::La8,
             RenderFormat::A8 => ColorType::L8,
@@ -199,6 +185,10 @@ impl ImageDecoder for TextureMapDecoder {
 
         scratch_image = crate::convert::decompress_dds(&self.texture, scratch_image).unwrap();
 
+        if scratch_image.metadata().format == DXGI_FORMAT_R16G16B16A16_FLOAT{
+            scratch_image = scratch_image.convert(DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT).map_err(DirectXTexError).unwrap();
+        }
+
         let blob = scratch_image
             .image(0, 0, 0)
             .unwrap()
@@ -206,6 +196,7 @@ impl ImageDecoder for TextureMapDecoder {
             .unwrap();
 
         let data = blob.buffer();
+
         buf.copy_from_slice(&data[data.len() - buf.len()..]);
 
         Ok(())
@@ -216,7 +207,55 @@ impl ImageDecoder for TextureMapDecoder {
     }
 }
 
-mod helpers {
+pub struct BoxReflectionDecoder {
+    texture: BoxReflection,
+    layout: CubemapLayout,
+}
+
+impl BoxReflectionDecoder {
+    pub fn from_box_reflection(texture: BoxReflection, layout: CubemapLayout) -> Self {
+        Self { texture, layout }
+    }
+}
+
+impl ImageDecoder for BoxReflectionDecoder {
+    fn dimensions(&self) -> (u32, u32) {
+        let (cols, rows) = self.layout.tile_counts();
+        ((BoxReflection::tile_width() * cols) as u32 , (BoxReflection::tile_height() * rows)  as u32 )
+    }
+
+    fn color_type(&self) -> ColorType {
+        ColorType::Rgba32F
+    }
+
+    fn read_image(self, buf: &mut [u8]) -> ImageResult<()>
+    where
+        Self: Sized,
+    {
+        let dds = self.texture.create_dds(Some(self.layout)).unwrap();
+        let mut scratch_image = ScratchImage::load_dds(
+            dds.as_slice(),
+            DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT,
+            None,
+            None,
+        ).map_err(DirectXTexError)
+            .unwrap();
+
+        scratch_image = scratch_image
+            .convert(DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT)
+            .unwrap();
+
+        buf.copy_from_slice(scratch_image.pixels());
+
+        Ok(())
+    }
+
+    fn read_image_boxed(self: Box<Self>, buf: &mut [u8]) -> ImageResult<()> {
+        (*self).read_image(buf)
+    }
+}
+
+pub(crate) mod helpers {
     use super::*;
     pub(super) fn color_type_to_dxgi(color_type: ExtendedColorType) -> Option<DXGI_FORMAT> {
         match color_type {
@@ -258,5 +297,58 @@ mod helpers {
             rgba.extend_from_slice(&0xFFFFu16.to_le_bytes());
         }
         rgba
+    }
+
+    pub(super) fn rgb32f_to_rgba32f(rgb: &[u8]) -> Vec<u8> {
+        assert_eq!(rgb.len() % 12, 0, "Input length must be divisible by 12.");
+        let mut rgba = Vec::with_capacity(rgb.len() / 3 * 4);
+        for chunk in rgb.chunks(12) {
+            rgba.extend_from_slice(&chunk[0..4]);
+            rgba.extend_from_slice(&chunk[4..8]);
+            rgba.extend_from_slice(&chunk[8..12]);
+            rgba.extend_from_slice(&1f32.to_le_bytes());
+        }
+        rgba
+    }
+
+    pub(crate) fn dynamic_image_to_scratch_image(buf: &[u8], width: u32, height: u32, color_type: ExtendedColorType) -> Result<ScratchImage, TextureMapEncodeError> {
+        let dxgi_format = helpers::color_type_to_dxgi(color_type)
+            .ok_or(TextureMapEncodeError::DxgiConversion(color_type))?;
+        let slice_pitch = dxgi_format
+            .compute_pitch(width as usize, height as usize, CP_FLAGS::CP_FLAGS_NONE)
+            .map_err(TextureMapEncodeError::DirectXTexError)?;
+
+        let width = width as usize;
+        let height = height as usize;
+
+        let maybe_converted;
+        let pixels = match color_type {
+            ExtendedColorType::Rgb8 | ExtendedColorType::Bgr8 => {
+                maybe_converted = Some(helpers::rgb8_to_rgba8(buf));
+                maybe_converted.as_ref().unwrap().as_ptr() as *mut u8
+            }
+            ExtendedColorType::Rgb16 => {
+                maybe_converted = Some(helpers::rgb16_to_rgba16(buf));
+                maybe_converted.as_ref().unwrap().as_ptr() as *mut u8
+            }
+            ExtendedColorType::Rgb32F => {
+                maybe_converted = Some(helpers::rgb32f_to_rgba32f(buf));
+                maybe_converted.as_ref().unwrap().as_ptr() as *mut u8
+            }
+            _ => buf.as_ptr() as *mut u8,
+        };
+
+        let image = directxtex::Image {
+            width,
+            height,
+            format: dxgi_format,
+            row_pitch: slice_pitch.row,
+            slice_pitch: slice_pitch.slice,
+            pixels,
+        };
+
+        let mut scratch_image = ScratchImage::default();
+        scratch_image.initialize_from_image(&image, false, CP_FLAGS::CP_FLAGS_NONE)?;
+        Ok(scratch_image)
     }
 }

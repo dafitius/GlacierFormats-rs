@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::from_utf8;
 use pathdiff::diff_paths;
-use crate::encryption::xtea::Xtea;
+use glacier_base::encryption::xtea::Xtea;
 use crate::ini_file::{IniFile, IniFileError, IniFileSection};
 use crate::utils::normalize_path;
 

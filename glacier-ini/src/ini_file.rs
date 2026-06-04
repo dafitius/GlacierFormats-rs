@@ -1,11 +1,10 @@
-use crate::encryption::xtea::Xtea;
-use crate::encryption::xtea::XteaError;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use std::io::Write;
 use std::ops::{Index, IndexMut};
 use std::collections::HashMap;
 use thiserror::Error;
+use glacier_base::encryption::xtea::{Xtea, XteaError};
 
 #[derive(Error, Debug)]
 pub enum IniFileError {
