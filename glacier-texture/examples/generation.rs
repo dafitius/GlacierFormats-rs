@@ -1,18 +1,19 @@
-use std::fs;
-use std::io::Cursor;
-use std::path::PathBuf;
-use rpkg_rs::resource::package_builder::{PackageBuilder, PackageResourceBuilder};
-use rpkg_rs::resource::pdefs::PartitionId;
-use rpkg_rs::resource::resource_package::{PackageVersion, ReferenceType, ResourceReferenceFlags, ResourceReferenceFlagsStandard};
-use rpkg_rs::resource::resource_partition::PatchId;
-use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use glacier_texture::enums::{InterpretAs, RenderFormat, TextureType};
 use glacier_texture::pack::MipFilter::Linear;
 use glacier_texture::pack::TextureMapBuilder;
 use glacier_texture::GlacierGame;
+use rpkg_rs::resource::package_builder::{PackageBuilder, PackageResourceBuilder};
+use rpkg_rs::resource::pdefs::PartitionId;
+use rpkg_rs::resource::resource_package::{
+    PackageVersion, ReferenceType, ResourceReferenceFlags, ResourceReferenceFlagsStandard,
+};
+use rpkg_rs::resource::resource_partition::PatchId;
+use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
+use std::fs;
+use std::io::Cursor;
+use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     //Parameters
     let tga_path = PathBuf::from("./target/texture.tga");
     let text_rrid = RuntimeResourceID::from_hex_string("000210D1CF04E4E4")?;
@@ -29,13 +30,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Create texture from tga
     let tga_data = Cursor::new(fs::read(tga_path)?);
-    let texture =
-        TextureMapBuilder::from_tga(tga_data)?
-            .interpret_as(InterpretAs::Normal)
-            .texture_type(TextureType::Colour)
-            .with_mip_filter(Linear)
-            .with_mipblock1(add_texd)
-            .with_format(RenderFormat::BC1).build(glacier_game)?;
+    let texture = TextureMapBuilder::from_tga(tga_data)?
+        .interpret_as(InterpretAs::Normal)
+        .texture_type(TextureType::Colour)
+        .with_mip_filter(Linear)
+        .with_mipblock1(add_texd)
+        .with_format(RenderFormat::BC1)
+        .build(glacier_game)?;
 
     //Add resources to package
     let mut texture_resource = PackageResourceBuilder::from_memory(
@@ -43,15 +44,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "TEXT",
         texture.pack_to_vec()?,
         match glacier_game {
-            GlacierGame::HM2016 => { Some(12) }
-            GlacierGame::HM2 | 
-            GlacierGame::HM3 | 
-            GlacierGame::KNT => { None }
-            _ => { unimplemented!() }
+            GlacierGame::HM2016 => Some(12),
+            GlacierGame::HM2 | GlacierGame::HM3 | GlacierGame::KNT => None,
+            _ => {
+                unimplemented!()
+            }
         },
         true,
     )?;
-    texture_resource.with_memory_requirements(0xFFFFFFFF, texture.video_memory_requirement() as u32);
+    texture_resource
+        .with_memory_requirements(0xFFFFFFFF, texture.video_memory_requirement() as u32);
 
     if texture.has_mipblock1() {
         let mipblock1 = texture.mipblock1().unwrap();
@@ -60,10 +62,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "TEXD",
             mipblock1.pack_to_vec(glacier_game)?,
             None,
-            false)?;
-        texture_resource.with_memory_requirements(0xFFFFFFFF, mipblock1.video_memory_requirement() as u32);
+            false,
+        )?;
+        texture_resource
+            .with_memory_requirements(0xFFFFFFFF, mipblock1.video_memory_requirement() as u32);
 
-        texture_resource.with_reference(texd_rrid, ResourceReferenceFlags::Standard(ResourceReferenceFlagsStandard::new().with_reference_type(ReferenceType::WEAK)));
+        texture_resource.with_reference(
+            texd_rrid,
+            ResourceReferenceFlags::Standard(
+                ResourceReferenceFlagsStandard::new().with_reference_type(ReferenceType::WEAK),
+            ),
+        );
         package.with_resource(highmip_resource);
     }
     package.with_resource(texture_resource);

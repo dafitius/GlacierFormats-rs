@@ -302,7 +302,7 @@ impl TextureMapHeaderImpl for TextureMapHeaderV3 {
             return 0;
         }
 
-        if self.type_ == TextureType::UNKNOWN512 {
+        if self.type_ == TextureType::Volume {
             return 0;
         }
 
@@ -413,7 +413,7 @@ impl TextureMapHeaderImpl for TextureMapHeaderV4 {
             return 0;
         }
 
-        if self.type_ == TextureType::UNKNOWN512 {
+        if self.type_ == TextureType::Volume {
             return 0;
         }
 
@@ -501,6 +501,14 @@ impl From<TextureMapInner<TextureMapHeaderV3>> for TextureMap {
     fn from(inner: TextureMapInner<TextureMapHeaderV3>) -> Self {
         Self {
             inner: TextureMapVersion::V3(inner),
+        }
+    }
+}
+
+impl From<TextureMapInner<TextureMapHeaderV4>> for TextureMap {
+    fn from(inner: TextureMapInner<TextureMapHeaderV4>) -> Self {
+        Self {
+            inner: TextureMapVersion::V4(inner),
         }
     }
 }
@@ -747,7 +755,7 @@ impl TextureMap {
                     .cloned()
                     .unwrap_or(0) as usize //The size of the largest TEXT mip
             }
-            GlacierGame::HM3 | GlacierGame::KNT  => {
+            GlacierGame::HM3 | GlacierGame::KNT => {
                 if self.has_mipblock1() {
                     //if texture has a TEXD
                     (self.mip_sizes().first().cloned().unwrap_or(0)
@@ -756,7 +764,7 @@ impl TextureMap {
                 } else {
                     0
                 }
-            },
+            }
         }
     }
 
@@ -792,7 +800,7 @@ impl TextureMap {
     }
 
     pub fn height(&self) -> usize {
-        if self.has_mipblock1() || self.independent()  {
+        if self.has_mipblock1() || self.independent() {
             self.texd_size().1
         } else {
             self.text_size().1
@@ -812,8 +820,8 @@ impl TextureMap {
 
     pub fn flags(&self) -> TextureFlags {
         match_texture_map!(&self.inner, tex => TextureFlags {
-                inner: tex.header.flags,
-            })
+            inner: tex.header.flags,
+        })
     }
 
     pub fn texture_type(&self) -> TextureType {
@@ -849,12 +857,14 @@ impl TextureMap {
         let file = File::open(path).map_err(TextureMapError::IoError)?;
         let mmap = unsafe { memmap2::Mmap::map(&file).map_err(TextureMapError::IoError)? };
         let mut reader = Cursor::new(&mmap[..]);
-        TextureMap::read_le_args(&mut reader, (glacier_game,)).map_err(TextureMapError::ParsingError)
+        TextureMap::read_le_args(&mut reader, (glacier_game,))
+            .map_err(TextureMapError::ParsingError)
     }
 
     pub fn from_memory(data: &[u8], glacier_game: GlacierGame) -> Result<Self, TextureMapError> {
         let mut reader = Cursor::new(data);
-        TextureMap::read_le_args(&mut reader, (glacier_game,)).map_err(TextureMapError::ParsingError)
+        TextureMap::read_le_args(&mut reader, (glacier_game,))
+            .map_err(TextureMapError::ParsingError)
     }
 
     pub fn default_mipmap(&self) -> Result<MipLevel, TextureMapError> {
@@ -965,8 +975,8 @@ impl TextureMap {
             + match &self.inner {
                 TextureMapVersion::V1(_) => TextureMapHeaderV1::size(),
                 TextureMapVersion::V2(_) => TextureMapHeaderV2::size(),
-            TextureMapVersion::V3(_) => TextureMapHeaderV3::size(),
-            TextureMapVersion::V4(_) => TextureMapHeaderV4::size(),
+                TextureMapVersion::V3(_) => TextureMapHeaderV3::size(),
+                TextureMapVersion::V4(_) => TextureMapHeaderV4::size(),
             }
             + atlas_size;
 

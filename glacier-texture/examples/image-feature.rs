@@ -1,11 +1,11 @@
-use std::env;
 use glacier_texture::enums::{RenderFormat, TextureType};
 use glacier_texture::image::{TextureMapDecoder, TextureMapEncoder};
 use glacier_texture::mipblock::MipblockData;
 use glacier_texture::pack::{TextureMapBuilder, TextureMapParameters};
 use glacier_texture::texture_map::TextureMap;
 use glacier_texture::{convert, GlacierGame};
-use image::{DynamicImage};
+use image::DynamicImage;
+use std::env;
 use std::io::{BufReader, BufWriter, Cursor};
 use std::path::PathBuf;
 
@@ -13,7 +13,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
-        eprintln!("Usage: {} <input_image> <output_image> [--high-level]", args[0]);
+        eprintln!(
+            "Usage: {} <input_image> <output_image> [--high-level]",
+            args[0]
+        );
         std::process::exit(1);
     }
     let input_path = PathBuf::from(&args[1]);
@@ -29,7 +32,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-fn main_low_level(input_path: PathBuf, output_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn main_low_level(
+    input_path: PathBuf,
+    output_path: PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
     //Set up resource buffers
     let mut text = vec![];
     let mut texd = vec![];
@@ -69,8 +75,10 @@ fn main_low_level(input_path: PathBuf, output_path: PathBuf) -> Result<(), Box<d
     Ok(())
 }
 
-fn main_high_level(input_path: PathBuf, output_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    
+fn main_high_level(
+    input_path: PathBuf,
+    output_path: PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
     //read the image
     let jpeg = image::open(input_path)?;
 
@@ -79,7 +87,7 @@ fn main_high_level(input_path: PathBuf, output_path: PathBuf) -> Result<(), Box<
         .with_format(RenderFormat::BC7)
         .with_texture_type(TextureType::Colour)
         .build(GlacierGame::HM3)?;
-    
+
     //create and save image
     let image = convert::create_dynamic_image(&texture_map)?;
     image.save(output_path)?;

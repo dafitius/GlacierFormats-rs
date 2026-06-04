@@ -4,7 +4,7 @@ use crate::mipblock::MipblockData;
 use crate::pack::TexturePackerError::{DirectXTexError, PackingError};
 use crate::texture_map::{
     TextureData, TextureMap, TextureMapHeaderV1, TextureMapHeaderV2, TextureMapHeaderV3,
-    TextureMapInner,
+    TextureMapHeaderV4, TextureMapInner,
 };
 use crate::{convert, GlacierGame};
 use directxtex::{
@@ -15,8 +15,8 @@ use directxtex::{
 use image::DynamicImage;
 use lz4::block::CompressionMode;
 use std::cmp::max;
+use std::io;
 use std::io::{Cursor, Read};
-use std::{io};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -381,22 +381,22 @@ impl TextureMapBuilder {
         };
 
         // if cfg!(windows) {
-            filter |= TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC;
+        filter |= TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC;
         // }
 
         let mut image = self.image;
-        if image.metadata().format.is_compressed(){
+        if image.metadata().format.is_compressed() {
             image = directxtex::decompress(
                 image.images(),
                 image.metadata(),
                 match image.metadata().format {
-                    DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM |
-                    DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM |
-                    DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM |
-                    DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => {DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM}
-                    DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM => { DXGI_FORMAT::DXGI_FORMAT_A8_UNORM}
-                    DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM => {DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM}
-                    _ => DXGI_FORMAT::DXGI_FORMAT_UNKNOWN
+                    DXGI_FORMAT::DXGI_FORMAT_BC1_UNORM
+                    | DXGI_FORMAT::DXGI_FORMAT_BC2_UNORM
+                    | DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM
+                    | DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM => DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
+                    DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM => DXGI_FORMAT::DXGI_FORMAT_A8_UNORM,
+                    DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM => DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM,
+                    _ => DXGI_FORMAT::DXGI_FORMAT_UNKNOWN,
                 },
             )?;
         }
@@ -487,7 +487,9 @@ impl TextureMapBuilder {
                     flags: TextureFlagsInner::default(), //detached from builder
                     width,
                     height,
-                    format: WoaRenderFormat { format: self.params.format },
+                    format: WoaRenderFormat {
+                        format: self.params.format,
+                    },
                     num_mip_levels,
                     default_mip_level: self.params.default_mip_level,
                     interpret_as: self.params.interpret_as,
@@ -512,7 +514,9 @@ impl TextureMapBuilder {
                     flags: TextureFlagsInner::default(), //detached from builder
                     width,
                     height,
-                    format: WoaRenderFormat { format: self.params.format },
+                    format: WoaRenderFormat {
+                        format: self.params.format,
+                    },
                     num_mip_levels,
                     default_mip_level: max(self.params.default_mip_level, 1), //H2 crashes with index 0
                     mip_sizes,
@@ -532,7 +536,9 @@ impl TextureMapBuilder {
                     flags: self.params.flags,
                     width,
                     height,
-                    format: WoaRenderFormat { format: self.params.format },
+                    format: WoaRenderFormat {
+                        format: self.params.format,
+                    },
                     num_mip_levels,
                     default_mip_level: self.params.default_mip_level,
                     interpret_as: self.params.interpret_as,
@@ -547,8 +553,31 @@ impl TextureMapBuilder {
                     data: texture_data,
                 }
                 .into()
-            },
-            GlacierGame::KNT => {todo!()}
+            }
+            GlacierGame::KNT => {
+                let header = TextureMapHeaderV4 {
+                    type_: self.params.texture_type,
+                    flags: self.params.flags,
+                    width,
+                    height,
+                    format: BondRenderFormat {
+                        format: self.params.format,
+                    },
+                    num_mip_levels,
+                    default_mip_level: self.params.default_mip_level,
+                    interpret_as: self.params.interpret_as,
+                    dimensions: self.params.dimensions,
+                    mip_sizes,
+                    compressed_mip_sizes,
+                    has_atlas: self.atlas_data.is_some(),
+                };
+                TextureMapInner {
+                    header,
+                    atlas_data: self.atlas_data,
+                    data: texture_data,
+                }
+                .into()
+            }
         };
 
         Ok(texture_map_inner)

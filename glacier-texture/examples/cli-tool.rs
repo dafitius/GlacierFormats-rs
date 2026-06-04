@@ -112,8 +112,8 @@ fn main() -> Result<()> {
 
             let output_path = get_output_path(&cli.global_opts.output_path, &cmd.input_path, "dds");
 
-            let dds = convert::create_dds(&tex)
-                .context("Failed to create DDS from the texture map")?;
+            let dds =
+                convert::create_dds(&tex).context("Failed to create DDS from the texture map")?;
             fs::write(&output_path, dds)
                 .with_context(|| format!("Failed to write DDS file to {:?}", output_path))?;
 
@@ -126,8 +126,8 @@ fn main() -> Result<()> {
 
             let output_path = get_output_path(&cli.global_opts.output_path, &cmd.input_path, "tga");
 
-            let tga = convert::create_tga(&tex)
-                .context("Failed to create TGA from the texture map")?;
+            let tga =
+                convert::create_tga(&tex).context("Failed to create TGA from the texture map")?;
             fs::write(&output_path, tga)
                 .with_context(|| format!("Failed to write TGA file to {:?}", output_path))?;
 
@@ -148,8 +148,11 @@ fn main() -> Result<()> {
 
             let text_path = get_output_path(&cli.global_opts.output_path, &cmd.input_path, "TEXT");
 
-            fs::write(&text_path, tex.pack_to_vec().context("Failed to pack TEXT data")?)
-                .with_context(|| format!("Failed to write TEXT file to {:?}", text_path))?;
+            fs::write(
+                &text_path,
+                tex.pack_to_vec().context("Failed to pack TEXT data")?,
+            )
+            .with_context(|| format!("Failed to write TEXT file to {:?}", text_path))?;
 
             if !cli.global_opts.silent {
                 println!("Successfully converted TGA to TEXT at {:?}", text_path);
@@ -164,7 +167,7 @@ fn main() -> Result<()> {
                         .pack_to_vec(cmd.game_version)
                         .context("Failed to pack TEXD data")?,
                 )
-                    .with_context(|| format!("Failed to write TEXD file to {:?}", texd_path))?;
+                .with_context(|| format!("Failed to write TEXD file to {:?}", texd_path))?;
 
                 if !cli.global_opts.silent {
                     println!("Successfully wrote TEXD at {:?}", texd_path);
@@ -174,32 +177,43 @@ fn main() -> Result<()> {
         Command::PortTextureMap(cmd) => {
             let tex = read_texture_port(&cmd)?;
 
-            let output_path = get_output_path(&cli.global_opts.output_path, &cmd.input_path, "TEXT");
+            let output_path =
+                get_output_path(&cli.global_opts.output_path, &cmd.input_path, "TEXT");
 
             let builder = TextureMapBuilder::from_texture_map(&tex)
                 .context("Failed to create TextureMapBuilder from existing TextureMap")?
                 .with_mipblock1(!cmd.no_texd);
 
-            let ported_tex = builder.build(cmd.to_version)
+            let ported_tex = builder
+                .build(cmd.to_version)
                 .context("Failed to build ported TextureMap")?;
 
-            fs::write(&output_path, ported_tex.pack_to_vec().context("Failed to pack TEXT data")?)
-                .with_context(|| format!("Failed to write ported TEXT file to {:?}", output_path))?;
+            fs::write(
+                &output_path,
+                ported_tex
+                    .pack_to_vec()
+                    .context("Failed to pack TEXT data")?,
+            )
+            .with_context(|| format!("Failed to write ported TEXT file to {:?}", output_path))?;
 
             if !cli.global_opts.silent {
-                println!("Successfully ported TEXT from {:?} to {:?} at {:?}", cmd.from_version, cmd.to_version, output_path);
+                println!(
+                    "Successfully ported TEXT from {:?} to {:?} at {:?}",
+                    cmd.from_version, cmd.to_version, output_path
+                );
             }
 
             if ported_tex.has_mipblock1() {
                 let texd_path = output_path.with_extension("TEXD");
                 fs::write(
                     &texd_path,
-                    ported_tex.mipblock1()
+                    ported_tex
+                        .mipblock1()
                         .context("Failed to retrieve TEXD data from ported TextureMap")?
                         .pack_to_vec(cmd.to_version)
                         .context("Failed to pack TEXD data")?,
                 )
-                    .with_context(|| format!("Failed to write ported TEXD file to {:?}", texd_path))?;
+                .with_context(|| format!("Failed to write ported TEXD file to {:?}", texd_path))?;
 
                 if !cli.global_opts.silent {
                     println!("Successfully wrote ported TEXD at {:?}", texd_path);
@@ -223,8 +237,10 @@ fn read_texture(cmd: &ConvertTextureMap, silent: bool) -> Result<TextureMap> {
     if let Some(texd_path) = &cmd.texd_path {
         let texd_data = fs::read(texd_path)
             .with_context(|| format!("Failed to read TEXD file at {:?}", texd_path))?;
-        tex.set_mipblock1(MipblockData::from_memory(&texd_data, cmd.game_version).context("Failed to apply TEXD data to TextureMap")?);
-
+        tex.set_mipblock1(
+            MipblockData::from_memory(&texd_data, cmd.game_version)
+                .context("Failed to apply TEXD data to TextureMap")?,
+        );
     }
 
     if !silent {
@@ -254,7 +270,10 @@ fn read_texture_port(cmd: &PortTextureMap) -> Result<TextureMap> {
         let texd_data = fs::read(texd_path)
             .with_context(|| format!("Failed to read TEXD file at {:?}", texd_path))?;
         let mut tex_with_texd = tex.clone();
-        tex_with_texd.set_mipblock1(MipblockData::from_memory(&texd_data, cmd.from_version).context("Failed to apply TEXD data to TextureMap")?);
+        tex_with_texd.set_mipblock1(
+            MipblockData::from_memory(&texd_data, cmd.from_version)
+                .context("Failed to apply TEXD data to TextureMap")?,
+        );
         Ok(tex_with_texd)
     } else {
         Ok(tex)

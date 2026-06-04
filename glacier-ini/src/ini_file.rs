@@ -1,10 +1,10 @@
+use glacier_base::encryption::xtea::{Xtea, XteaError};
 use indexmap::IndexMap;
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::io::Write;
 use std::ops::{Index, IndexMut};
-use std::collections::HashMap;
 use thiserror::Error;
-use glacier_base::encryption::xtea::{Xtea, XteaError};
 
 #[derive(Error, Debug)]
 pub enum IniFileError {
@@ -53,7 +53,7 @@ impl IniFileSection {
     pub fn option(&self, option_name: &str) -> Option<String> {
         self.options.get(option_name).cloned()
     }
-    
+
     pub fn with_option(&mut self, option_name: &str, value: &str) -> &mut Self {
         self.insert(option_name, value);
         self
@@ -76,7 +76,6 @@ impl IniFileSection {
         writeln!(writer).unwrap();
     }
 }
-
 
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct IniFileSection {
@@ -161,13 +160,15 @@ impl IniFile {
         }
         self.find_include_mut(include_name).unwrap()
     }
-    
+
     pub fn find_include(&self, include_name: &str) -> Option<&IniFile> {
         self.includes.iter().find(|incl| incl.name == include_name)
     }
 
     pub fn find_include_mut(&mut self, include_name: &str) -> Option<&mut IniFile> {
-        self.includes.iter_mut().find(|incl| incl.name == include_name)
+        self.includes
+            .iter_mut()
+            .find(|incl| incl.name == include_name)
     }
 
     pub fn get_option(
@@ -184,11 +185,11 @@ impl IniFile {
         }
     }
 
-    pub fn set_description(&mut self, description: &str){
+    pub fn set_description(&mut self, description: &str) {
         self.description = Some(description.to_string())
     }
 
-    pub fn with_description(&mut self, description: &str) -> &mut Self{
+    pub fn with_description(&mut self, description: &str) -> &mut Self {
         self.description = Some(description.to_string());
         self
     }
@@ -197,24 +198,25 @@ impl IniFile {
         self.console_cmds.push(command.to_string());
         self
     }
-    
+
     pub fn add_section(&mut self, section: IniFileSection) {
         self.sections.insert(section.name.to_owned(), section);
     }
 
-    pub fn with_section(&mut self, name: &str) -> &mut IniFileSection { 
+    pub fn with_section(&mut self, name: &str) -> &mut IniFileSection {
         self.add_section(IniFileSection::new(name));
         self.sections.get_mut(name).unwrap()
     }
 
-    pub fn add_new_section(&mut self, section_name: &str, values: Option<Vec<(&str, &str)>>){
-        match self.sections.get_mut(section_name){
+    pub fn add_new_section(&mut self, section_name: &str, values: Option<Vec<(&str, &str)>>) {
+        match self.sections.get_mut(section_name) {
             None => {
-                self.sections.insert(section_name.to_string(), IniFileSection::new(section_name));
+                self.sections
+                    .insert(section_name.to_string(), IniFileSection::new(section_name));
                 self.add_new_section(section_name, values);
             }
             Some(section) => {
-                if let Some(values) = values{
+                if let Some(values) = values {
                     for (key, val) in values {
                         section.insert(key, val);
                     }
@@ -222,7 +224,7 @@ impl IniFile {
             }
         }
     }
-    
+
     pub fn section(&self, name: &str) -> Option<&IniFileSection> {
         self.sections.get(name)
     }
@@ -253,23 +255,25 @@ impl IniFile {
         self.console_cmds.push(command);
     }
 
-    pub fn add_include(&mut self, include: IniFile) -> Result<(), IniFileError>{
-        if self.includes.contains(&include){
-            return Err(IniFileError::IncludeAlreadyExists(include.name))
+    pub fn add_include(&mut self, include: IniFile) -> Result<(), IniFileError> {
+        if self.includes.contains(&include) {
+            return Err(IniFileError::IncludeAlreadyExists(include.name));
         }
         self.includes.push(include);
         Ok(())
     }
-    
+
     pub fn console_cmds(&self) -> &Vec<String> {
         &self.console_cmds
     }
 
-    pub fn write_to_file<W: Write>(&self, writer: &mut W) -> Result<(), IniFileError>{
+    pub fn write_to_file<W: Write>(&self, writer: &mut W, xtea: &Xtea) -> Result<(), IniFileError> {
         let mut string = String::new();
         self.write_ini(&mut string);
-        let data = Xtea::encrypt_text_file(string)?;
-        writer.write_all(data.as_slice()).map_err(IniFileError::IoError)
+        let data = xtea.encrypt_text_file(string)?;
+        writer
+            .write_all(data.as_slice())
+            .map_err(IniFileError::IoError)
     }
 
     pub(crate) fn write_ini<W: std::fmt::Write>(&self, writer: &mut W) {
@@ -290,7 +294,7 @@ impl IniFile {
         for console_cmd in &self.console_cmds {
             writeln!(writer, "ConsoleCmd {console_cmd}").unwrap();
         }
-        if !self.includes.is_empty(){
+        if !self.includes.is_empty() {
             writeln!(writer).unwrap();
         }
         for include in &self.includes {

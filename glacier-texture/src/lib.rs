@@ -2,16 +2,16 @@ use std::str::FromStr;
 
 pub mod texture_map;
 
-#[cfg(feature = "rpkg")]
-pub mod rpkg;
-pub mod convert;
-pub mod pack;
-pub mod enums;
-pub mod mipblock;
 pub mod atlas;
+pub mod box_reflection;
+pub mod convert;
+pub mod enums;
 #[cfg(feature = "image")]
 pub mod image;
-pub mod box_reflection;
+pub mod mipblock;
+pub mod pack;
+#[cfg(feature = "rpkg")]
+pub mod rpkg;
 
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Clone, Copy)]

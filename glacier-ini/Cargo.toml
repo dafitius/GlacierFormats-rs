@@ -1,6 +1,6 @@
 [package]
 name = "glacier-ini"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 license = "Apache-2.0"
 categories = ["game-development", "data-structures", "parser-implementations"]
@@ -12,15 +12,12 @@ repository = "https://github.com/dafitius/glacierformats-rs"
 status = "actively-developed"
 
 [dependencies]
-glacier-base = {path = "../glacier-base"}
+glacier-base = {path = "../glacier-base", version="0.2.0"}
 
 thiserror = "2.0.12"
 indexmap = "2.10.0"
 itertools = "0.14.0"
 pathdiff = "0.2.3"
-byteorder = "1.5.0"
-extended-tea = "0.1.1"
-crc32fast = "1.4.2"
 
 [dev-dependencies]
 

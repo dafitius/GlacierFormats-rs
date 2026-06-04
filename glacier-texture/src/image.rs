@@ -1,18 +1,21 @@
 use crate::atlas::AtlasData;
+use crate::box_reflection::{BoxReflection, BoxReflectionError, CubemapLayout};
 use crate::convert::create_dds;
 use crate::convert::TextureConversionError::DirectXTexError;
 use crate::enums::RenderFormat;
 use crate::mipblock::MipblockData;
 use crate::pack::{TextureMapBuilder, TextureMapParameters, TexturePackerError};
-use crate::texture_map::{TextureMap};
+use crate::texture_map::TextureMap;
 use crate::GlacierGame;
 use binrw::BinRead;
-use directxtex::{HResultError, ScratchImage, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT};
+use directxtex::{
+    HResultError, ScratchImage, CP_FLAGS, DDS_FLAGS, DXGI_FORMAT, DXGI_FORMAT_R16G16B16A16_FLOAT,
+    DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS, TEX_THRESHOLD_DEFAULT,
+};
 use image::error::{EncodingError, ImageFormatHint};
 use image::{ColorType, ExtendedColorType, ImageDecoder, ImageEncoder, ImageError, ImageResult};
 use std::io::{BufRead, Seek, Write};
 use thiserror::Error;
-use crate::box_reflection::{BoxReflection, BoxReflectionError, CubemapLayout};
 
 #[derive(Debug, Error)]
 pub enum TextureMapEncodeError {
@@ -69,7 +72,8 @@ impl<TW: Write, DW: Write> ImageEncoder for TextureMapEncoder<TW, DW> {
         height: u32,
         color_type: ExtendedColorType,
     ) -> ImageResult<()> {
-        let scratch_image = helpers::dynamic_image_to_scratch_image(buf, width, height, color_type)?;
+        let scratch_image =
+            helpers::dynamic_image_to_scratch_image(buf, width, height, color_type)?;
         let mut builder = TextureMapBuilder::from_scratch_image(scratch_image)
             .map_err(TextureMapEncodeError::Packer)?;
 
@@ -192,10 +196,17 @@ impl ImageDecoder for TextureMapDecoder {
 
         scratch_image = crate::convert::decompress_dds(&self.texture, scratch_image).unwrap();
 
-        if scratch_image.metadata().format == DXGI_FORMAT_R16G16B16A16_FLOAT{
-            scratch_image = scratch_image.convert(DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT).map_err(DirectXTexError).unwrap();
+        if scratch_image.metadata().format == DXGI_FORMAT_R16G16B16A16_FLOAT {
+            scratch_image = scratch_image
+                .convert(
+                    DXGI_FORMAT_R32G32B32A32_FLOAT,
+                    TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT,
+                    TEX_THRESHOLD_DEFAULT,
+                )
+                .map_err(DirectXTexError)
+                .unwrap();
         }
-        
+
         let blob = scratch_image
             .image(0, 0, 0)
             .unwrap()
@@ -207,7 +218,11 @@ impl ImageDecoder for TextureMapDecoder {
         if data.len() < buf.len() {
             return Err(ImageError::IoError(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
-                format!("DDS buffer too small: data has {} bytes, buf needs {}", data.len(), buf.len()),
+                format!(
+                    "DDS buffer too small: data has {} bytes, buf needs {}",
+                    data.len(),
+                    buf.len()
+                ),
             )));
         }
 
@@ -235,7 +250,10 @@ impl BoxReflectionDecoder {
 impl ImageDecoder for BoxReflectionDecoder {
     fn dimensions(&self) -> (u32, u32) {
         let (cols, rows) = self.layout.tile_counts();
-        ((BoxReflection::tile_width() * cols) as u32 , (BoxReflection::tile_height() * rows)  as u32 )
+        (
+            (BoxReflection::tile_width() * cols) as u32,
+            (BoxReflection::tile_height() * rows) as u32,
+        )
     }
 
     fn color_type(&self) -> ColorType {
@@ -252,11 +270,16 @@ impl ImageDecoder for BoxReflectionDecoder {
             DDS_FLAGS::DDS_FLAGS_FORCE_DX10_EXT,
             None,
             None,
-        ).map_err(DirectXTexError)
-            .unwrap();
+        )
+        .map_err(DirectXTexError)
+        .unwrap();
 
         scratch_image = scratch_image
-            .convert(DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT)
+            .convert(
+                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT,
+                TEX_THRESHOLD_DEFAULT,
+            )
             .unwrap();
 
         buf.copy_from_slice(scratch_image.pixels());
@@ -325,7 +348,12 @@ pub(crate) mod helpers {
         rgba
     }
 
-    pub(crate) fn dynamic_image_to_scratch_image(buf: &[u8], width: u32, height: u32, color_type: ExtendedColorType) -> Result<ScratchImage, TextureMapEncodeError> {
+    pub(crate) fn dynamic_image_to_scratch_image(
+        buf: &[u8],
+        width: u32,
+        height: u32,
+        color_type: ExtendedColorType,
+    ) -> Result<ScratchImage, TextureMapEncodeError> {
         let dxgi_format = helpers::color_type_to_dxgi(color_type)
             .ok_or(TextureMapEncodeError::DxgiConversion(color_type))?;
         let slice_pitch = dxgi_format

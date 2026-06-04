@@ -1,2 +1,2 @@
-pub mod math;
 pub mod encryption;
+pub mod math;
