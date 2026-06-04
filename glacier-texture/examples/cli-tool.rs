@@ -3,7 +3,6 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use binrw::BinRead;
 use clap::{Args, Parser, Subcommand};
 use glacier_texture::convert;
 use glacier_texture::mipblock::MipblockData;

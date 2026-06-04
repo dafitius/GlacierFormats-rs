@@ -1,18 +1,15 @@
-use std::fs;
-use std::io::Cursor;
-use std::path::PathBuf;
-use binrw::BinRead;
-use rpkg_rs::resource::package_builder::{PackageBuilder, PackageResourceBuilder};
-use rpkg_rs::resource::pdefs::{PartitionId, PartitionType};
-use rpkg_rs::resource::resource_package::{PackageVersion, ReferenceType, ResourceReferenceFlags, ResourceReferenceFlagsStandard};
-use rpkg_rs::resource::resource_partition::PatchId;
-use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
-use glacier_texture::enums::{InterpretAs, RenderFormat, TextureType};
+use glacier_texture::enums::RenderFormat;
 use glacier_texture::mipblock::MipblockData;
 use glacier_texture::pack::MipFilter::Linear;
 use glacier_texture::pack::TextureMapBuilder;
 use glacier_texture::texture_map::TextureMap;
 use glacier_texture::GlacierGame;
+use rpkg_rs::resource::package_builder::{PackageBuilder, PackageResourceBuilder};
+use rpkg_rs::resource::pdefs::PartitionId;
+use rpkg_rs::resource::resource_package::{PackageVersion, ReferenceType, ResourceReferenceFlags, ResourceReferenceFlagsStandard};
+use rpkg_rs::resource::resource_partition::PatchId;
+use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
+use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 

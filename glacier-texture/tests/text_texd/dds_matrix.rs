@@ -1,15 +1,14 @@
-use std::fs;
-use std::io::Cursor;
+use crate::read_fixture;
 use binrw::BinRead;
-use directxtex::{convert, DDS_FLAGS, DXGI_FORMAT, TEX_FILTER_DEFAULT, TGA_FLAGS};
-use image::ImageFormat;
+use directxtex::{DDS_FLAGS, DXGI_FORMAT, TEX_FILTER_DEFAULT, TGA_FLAGS};
 use glacier_texture::enums::{InterpretAs, RenderFormat, TextureType};
 use glacier_texture::mipblock::MipblockData;
 use glacier_texture::pack::{MipFilter, MipLevels, TextureMapBuilder};
 use glacier_texture::texture_map::TextureMap;
 use glacier_texture::GlacierGame;
+use image::ImageFormat;
 use rstest::rstest;
-use crate::read_fixture;
+use std::io::Cursor;
 
 fn load_dds(bytes: &[u8]) -> Result<directxtex::ScratchImage , Box<dyn std::error::Error>> {
     directxtex::ScratchImage::load_dds(bytes, DDS_FLAGS::DDS_FLAGS_NONE, None, None).map_err(Into::into)

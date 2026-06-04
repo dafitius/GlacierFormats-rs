@@ -10,7 +10,7 @@ use crate::image::helpers;
 
 #[cfg(feature = "image")]
 use image::{ColorType, DynamicImage, ExtendedColorType};
-use image::{ImageBuffer, Rgba, Rgba32FImage};
+use image::{Rgba32FImage};
 use glacier_base::math::Vector3;
 pub use cubemap_utils::Orientation;
 
@@ -282,8 +282,7 @@ impl BoxReflection {
 
         let bytes = scratch.pixels();
 
-        let expected_len = width * height * 4 * 2;
-        if bytes.len() != expected_len as usize {
+        if bytes.len() != (width * height * 4 * 2) {
             return Err(BoxReflectionError::Other(
                 "Failed to parse texture to image format".to_string(),
             ));

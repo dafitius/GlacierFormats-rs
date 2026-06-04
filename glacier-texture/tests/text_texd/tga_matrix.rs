@@ -1,13 +1,12 @@
-use std::io::Cursor;
+use crate::read_fixture;
 use binrw::BinRead;
-use directxtex::convert;
 use glacier_texture::enums::{InterpretAs, RenderFormat, TextureType};
 use glacier_texture::mipblock::MipblockData;
 use glacier_texture::pack::{MipFilter, MipLevels, TextureMapBuilder};
 use glacier_texture::texture_map::TextureMap;
 use glacier_texture::GlacierGame;
 use rstest::rstest;
-use crate::read_fixture;
+use std::io::Cursor;
 
 #[rstest]
 #[case("source/A8_UNORM.tga", RenderFormat::A8)]
