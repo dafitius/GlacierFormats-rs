@@ -43,12 +43,14 @@ impl From<Quaternion> for UnitQuaternion<f32> {
 }
 
 impl Quaternion {
+    #[allow(unused)]
     fn add(&self, other: &Self) -> Self {
         let self_quat: UnitQuaternion<f32> = (*self).into();
         let other_quat: UnitQuaternion<f32> = (*other).into();
         UnitQuaternion::<f32>::from_quaternion(self_quat.add(other_quat.as_ref())).into()
     }
 
+    #[allow(unused)]
     fn multiply(&self, other: &Self) -> Self {
         let self_quat: UnitQuaternion<f32> = (*self).into();
         let other_quat: UnitQuaternion<f32> = (*other).into();
@@ -278,6 +280,7 @@ impl Matrix43 {
         &self.x_axis
     }
 
+    #[allow(unused)]
     fn x_axis_mut(&mut self) -> &mut Vector3 {
         &mut self.x_axis
     }
@@ -286,6 +289,7 @@ impl Matrix43 {
         &self.y_axis
     }
 
+    #[allow(unused)]
     fn y_axis_mut(&mut self) -> &mut Vector3 {
         &mut self.y_axis
     }
@@ -294,6 +298,7 @@ impl Matrix43 {
         &self.z_axis
     }
 
+    #[allow(unused)]
     fn z_axis_mut(&mut self) -> &mut Vector3 {
         &mut self.z_axis
     }
@@ -302,6 +307,7 @@ impl Matrix43 {
         &self.trans
     }
 
+    #[allow(unused)]
     fn trans_mut(&mut self) -> &mut Vector3 {
         &mut self.trans
     }
