@@ -171,6 +171,7 @@ impl ImageDecoder for TextureMapDecoder {
             RenderFormat::BC3 => ColorType::Rgba8,
             RenderFormat::BC4 => ColorType::L8,
             RenderFormat::BC5 => ColorType::La8,
+            RenderFormat::BC6 => ColorType::Rgba32F,
             RenderFormat::BC7 => ColorType::Rgba8,
         }
     }

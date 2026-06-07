@@ -25,7 +25,7 @@ pub enum TextureType {
     Cubemap = 256, //uses ascolormap and ascubemap
     Volume = 512,  //uses asheightmap & asvolume
     UNKNOWN517 = 517, //introduced in knt
-                   //UNKNOWN1024 = 1024, //unused in woa
+    //UNKNOWN1024 = 1024, //unused in woa
 }
 
 #[derive(BinRead, BinWrite, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Default)]
@@ -42,9 +42,10 @@ pub enum InterpretAs {
     Volume = 64,   //This as well
 }
 
+#[non_exhaustive]
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub enum RenderFormat {
-    R32G32B32A32, //idk
+    R32G32B32A32,
     R16G16B16A16,
     R8G8B8A8,
     R32,
@@ -55,6 +56,7 @@ pub enum RenderFormat {
     BC3,
     BC4,
     BC5,
+    BC6,
     BC7,
 }
 
@@ -67,6 +69,7 @@ impl RenderFormat {
                 | RenderFormat::BC3
                 | RenderFormat::BC4
                 | RenderFormat::BC5
+                | RenderFormat::BC6
                 | RenderFormat::BC7
         )
     }
@@ -75,6 +78,7 @@ impl RenderFormat {
         match self {
             RenderFormat::A8 | RenderFormat::R32 | RenderFormat::BC4 => 1,
             RenderFormat::R8G8 | RenderFormat::BC5 => 2,
+            RenderFormat::BC6 => 3,
             RenderFormat::BC1 | //assume DXT1a
             RenderFormat::R32G32B32A32 |
             RenderFormat::R16G16B16A16 |
@@ -92,6 +96,7 @@ impl RenderFormat {
             RenderFormat::BC3 => RenderFormat::R8G8B8A8,
             RenderFormat::BC4 => RenderFormat::A8,
             RenderFormat::BC5 => RenderFormat::R8G8,
+            RenderFormat::BC6 => RenderFormat::R16G16B16A16,
             RenderFormat::BC7 => RenderFormat::R8G8B8A8,
             format => *format,
         }
@@ -112,6 +117,7 @@ impl From<RenderFormat> for DXGI_FORMAT {
             RenderFormat::BC3 => DXGI_FORMAT::DXGI_FORMAT_BC3_UNORM,
             RenderFormat::BC4 => DXGI_FORMAT::DXGI_FORMAT_BC4_UNORM,
             RenderFormat::BC5 => DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM,
+            RenderFormat::BC6 => DXGI_FORMAT::DXGI_FORMAT_BC6H_UF16,
             RenderFormat::BC7 => DXGI_FORMAT::DXGI_FORMAT_BC7_UNORM,
         }
     }
@@ -134,7 +140,7 @@ pub trait RenderFormatMapping {
 
 #[derive(BinRead, BinWrite, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub struct WoaRenderFormat {
-    #[br(try_map = |raw: u16| Self::try_from_u16(raw).ok_or("invalid WOA render format"))]
+    #[br(try_map = |raw: u16| Self::try_from_u16(raw).ok_or(format!("invalid Woa render format {}", raw)))]
     #[bw(map = |fmt: &RenderFormat| Self::try_to_u16(*fmt).expect("unsupported WOA render format"))]
     pub(crate) format: RenderFormat,
 }
@@ -151,6 +157,7 @@ impl RenderFormatMapping for WoaRenderFormat {
         (0x4F, RenderFormat::BC3),
         (0x52, RenderFormat::BC4),
         (0x55, RenderFormat::BC5),
+        (0x57, RenderFormat::BC6),
         (0x5A, RenderFormat::BC7),
     ];
 }
@@ -276,6 +283,7 @@ pub(crate) struct TextureFlagsInner {
     __: u32,
 }
 
+#[derive(Debug)]
 pub struct TextureFlags {
     ///inner "real" flags bitfield. Wrapped because it is likely to change over time.
     /// Wrapping the struct makes it possible to #\[deprecated\] old getters and setters

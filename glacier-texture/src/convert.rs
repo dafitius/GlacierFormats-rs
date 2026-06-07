@@ -181,16 +181,10 @@ pub(crate) fn decompress_dds(
 ) -> Result<ScratchImage, TextureConversionError> {
     let mut scratch_image = scratch_image;
     if tex.format().is_compressed() {
-        //We can safely assume a compressed texture to never be 16-bit HDR
         scratch_image = directxtex::decompress(
             scratch_image.images(),
             scratch_image.metadata(),
-            match tex.format().num_channels() {
-                1 => DXGI_FORMAT::DXGI_FORMAT_A8_UNORM,
-                2 => DXGI_FORMAT::DXGI_FORMAT_R8G8_UNORM,
-                4 => DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM,
-                _ => DXGI_FORMAT::DXGI_FORMAT_UNKNOWN,
-            },
+            tex.format().decompressed_format().into(),
         )
         .map_err(DirectXTexError)?
     }
