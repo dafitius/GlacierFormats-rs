@@ -26,9 +26,12 @@ pub enum XteaConfig {
     Woa,
     Knt,
     Custom {
+        /// The XTEA key
         key: [u32; 4],
+        /// Plaintext 16-byte file header magic. Is XTEA-encrypted before being written as a header
         header: [u8; 0x10],
-        l10n_key: [u32; 4],
+        /// The localisation XTEA key
+        l10n_key: [u32; 4], 
     },
 }
 
@@ -46,15 +49,9 @@ impl XteaConfig {
 
     pub const fn header(self) -> [u8; 0x10] {
         match self {
-            Self::Woa => [
-                0x22, 0x3d, 0x6f, 0x9a, 0xb3, 0xf8, 0xfe, 0xb6, 0x61, 0xd9, 0xcc, 0x1c, 0x62, 0xde,
-                0x83, 0x41,
-            ],
-            Self::Knt => [
-                0xB7, 0xE2, 0xEA, 0x00, 0x54, 0x5B, 0x6B, 0x87, 0x11, 0xBD, 0x6F, 0xE8, 0x4D, 0x6A,
-                0xD4, 0xBF,
-            ],
-            Self::Custom { header, .. } => header,
+            XteaConfig::Woa => {*b"[*Scrambled**]\r\n"}
+            XteaConfig::Knt => {*b"Bond, James Bond"}
+            XteaConfig::Custom { header, .. } => {header}
         }
     }
 
@@ -91,7 +88,10 @@ impl Xtea {
     /// Checks if a given buffer represents an encrypted text file.
     /// This function will check for the presence of a default header in the text file.
     pub fn is_encrypted_text_file(&self, input_buffer: &[u8]) -> bool {
-        input_buffer.starts_with(&self.config.header())
+        match Xtea::encrypt_header(self.config().header(), &self.config().key()) {
+            Ok(encrypted_header) => input_buffer.starts_with(&encrypted_header),
+            Err(_) => false
+        }
     }
 
     /// Decrypts a text file given its buffer, uses the default xtea key.
@@ -175,7 +175,8 @@ impl Xtea {
             .map_err(XteaError::CipherError)?;
 
         let mut final_buffer = Vec::new();
-        final_buffer.extend_from_slice(&self.config.header());
+        let encrypted_header = Xtea::encrypt_header(self.config().header(), &self.config().key())?;
+        final_buffer.extend_from_slice(&encrypted_header);
 
         final_buffer
             .write_u32::<LittleEndian>(checksum)
@@ -200,6 +201,19 @@ impl Xtea {
 
         let mut input_reader = Cursor::new(&input_buffer);
         let mut output_writer = Cursor::new(&mut out_buffer);
+
+        xtea.encipher_stream::<LittleEndian, _, _>(&mut input_reader, &mut output_writer)
+            .map_err(XteaError::CipherError)?;
+
+        Ok(out_buffer)
+    }
+
+    fn encrypt_header(input: [u8; 0x10], key: &[u32; 4]) -> Result<[u8; 0x10], XteaError> {
+        let mut out_buffer = [0u8; 0x10];
+        let xtea = XTEA::new(key);
+
+        let mut input_reader = Cursor::new(input);
+        let mut output_writer = Cursor::new(&mut out_buffer[..]);
 
         xtea.encipher_stream::<LittleEndian, _, _>(&mut input_reader, &mut output_writer)
             .map_err(XteaError::CipherError)?;
