@@ -1,5 +1,4 @@
 use crate::convert;
-use crate::image::helpers;
 use binrw::{binrw, BinRead, BinWriterExt};
 use directxtex::{
     HResultError, Image, ScratchImage, CP_FLAGS, CP_FLAGS_NONE, DDS_FLAGS, DDS_FLAGS_NONE,
@@ -14,7 +13,6 @@ use std::{fs, io, slice};
 
 pub use cubemap_utils::Orientation;
 use glacier_base::math::Vector3;
-use image::Rgba32FImage;
 #[cfg(feature = "image")]
 use image::{ColorType, DynamicImage, ExtendedColorType};
 
@@ -193,6 +191,7 @@ impl BoxReflection {
         128
     }
 
+    #[allow(dead_code)]
     pub(crate) fn buffer_size(&self) -> usize {
         self.buffer.len()
     }
@@ -220,7 +219,7 @@ impl BoxReflection {
             }
         };
 
-        let scratch_image = helpers::dynamic_image_to_scratch_image(
+        let scratch_image = crate::image::helpers::dynamic_image_to_scratch_image(
             image.as_bytes(),
             image.width(),
             image.height(),
@@ -319,6 +318,8 @@ impl BoxReflection {
         layout: CubemapLayout,
         rotation: [Option<Orientation>; 3],
     ) -> Result<DynamicImage, BoxReflectionError> {
+        use image::Rgba32FImage;
+
         let cubemap = self.create_cubemap_image(true)?;
         let scratch = cubemap_utils::compose_layout_with_rotation(&cubemap, layout, rotation)?;
 
