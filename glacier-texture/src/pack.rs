@@ -401,13 +401,16 @@ impl TextureMapBuilder {
             )?;
         }
 
-        image = image.generate_mip_maps(
-            filter,
-            match self.params.num_mip_levels {
-                MipLevels::All => 0,
-                MipLevels::Limit(n) => n as usize,
-            },
-        )?;
+        let should_generate_mips = self.use_mipblock1 && !matches!(self.params.num_mip_levels, Limit(1));
+        if should_generate_mips {
+            image = image.generate_mip_maps(
+                filter,
+                match self.params.num_mip_levels {
+                    MipLevels::All => 0,
+                    Limit(n) => n as usize,
+                },
+            )?;
+        }
 
         let target_format = self.params.format.into();
         if image.metadata().format != target_format {
