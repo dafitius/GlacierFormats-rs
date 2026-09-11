@@ -267,7 +267,6 @@ impl From<Dimensions> for TEX_DIMENSION {
 
 #[bitfield(u32)]
 #[derive(BinRead, BinWrite, Serialize, Deserialize)]
-//#[brw(repr = u32)]
 //most of these are unused...
 pub(crate) struct TextureFlagsInner {
     /* 0x1 */ pub(crate) swizzled: bool,
@@ -277,10 +276,12 @@ pub(crate) struct TextureFlagsInner {
     pub(crate) unknown1: bool, //Does not affect the texture in-game. Usually not enabled on non-normal/color types, or uncompressed formats
     /* 0x10 */ pub(crate) atlas: bool, //Only used on atlas textures
     /* 0x20 */ pub(crate) ddsc_encoded: bool,
-    /* 0x40 */ pub(crate) unknown3: bool, //Not enabling this will corrupt most textures
+    /* 0x40 */ pub(crate) lz4_compression: bool,
+    /* 0x50 */ pub(crate) __: bool,
+    /* 0x60 */ pub(crate) unknown4: bool, //Used when there is no texture data. Still contains some metadata
 
-    #[bits(25)]
-    __: u32,
+    #[bits(23)]
+    remainder: u32,
 }
 
 #[derive(Debug)]
@@ -294,6 +295,7 @@ pub struct TextureFlags {
 /// The "unstable" flags are not found in any production texture file. Use at your own risk
 /// The other flags should not crash the game, but can also result in corrupted textures, use with caution
 impl TextureFlags {
+    pub fn unknown4(&self) -> bool { self.inner.unknown4()}
     pub fn deferred(&self) -> bool {
         self.inner.deferred()
     }
@@ -303,8 +305,12 @@ impl TextureFlags {
     pub fn atlas(&self) -> bool {
         self.inner.atlas()
     }
+    #[deprecated(since= "2.1.1", note = "No longer unknown, use lz4_compression")]
     pub fn unknown3(&self) -> bool {
-        self.inner.unknown3()
+        self.inner.lz4_compression()
+    }
+    pub fn lz4_compression(&self) -> bool {
+        self.inner.lz4_compression()
     }
 
     pub fn set_deferred(&mut self, value: bool) {
@@ -313,8 +319,12 @@ impl TextureFlags {
     pub fn set_unknown1(&mut self, value: bool) {
         self.inner.set_unknown1(value)
     }
+    #[deprecated(since= "2.1.1", note = "No longer unknown, use set_lz4_compression")]
     pub fn set_unknown3(&mut self, value: bool) {
-        self.inner.set_unknown3(value)
+        self.inner.set_lz4_compression(value)
+    }
+    pub fn set_lz4_compression(&mut self, value: bool) {
+        self.inner.set_lz4_compression(value)
     }
 
     pub fn set_atlas(&mut self, value: bool) {
@@ -335,9 +345,16 @@ impl TextureFlags {
             inner: self.inner.with_atlas(value),
         }
     }
+    #[deprecated(since= "2.1.1", note = "No longer unknown, use with_lz4_compression")]
     pub fn with_unknown3(&mut self, value: bool) -> Self {
         Self {
-            inner: self.inner.with_unknown3(value),
+            inner: self.inner.with_lz4_compression(value),
+        }
+    }
+
+    pub fn with_lz4_compression(&mut self, value: bool) -> Self {
+        Self {
+            inner: self.inner.with_lz4_compression(value),
         }
     }
 

@@ -22,6 +22,15 @@ pub enum GlacierGame {
     KNT,
 }
 
+impl GlacierGame{
+    pub(crate) fn supports_lz4_compression(&self) -> bool{
+        match self{
+            GlacierGame::HM2016 | GlacierGame::HM2 => false,
+            GlacierGame::HM3 | GlacierGame::KNT => true
+        }
+    }
+}
+
 impl FromStr for GlacierGame {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {

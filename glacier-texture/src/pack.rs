@@ -1,5 +1,4 @@
 use crate::atlas::AtlasData;
-use crate::enums::*;
 use crate::mipblock::MipblockData;
 use crate::pack::TexturePackerError::{DirectXTexError, PackingError};
 use crate::texture_map::{
@@ -18,6 +17,8 @@ use std::cmp::max;
 use std::io;
 use std::io::{Cursor, Read};
 use thiserror::Error;
+use crate::enums::{Dimensions, InterpretAs, RenderFormat, TextureType, TextureFlagsInner, TextureFlags, WoaRenderFormat, BondRenderFormat};
+use crate::pack::MipLevels::Limit;
 
 #[derive(Debug, Error)]
 pub enum TexturePackerError {
@@ -68,7 +69,7 @@ impl TextureMapParameters {
             interpret_as: InterpretAs::Normal,
             dimensions: Dimensions::_2D,
 
-            flags: TextureFlagsInner::default().with_unknown3(true),
+            flags: TextureFlagsInner::default().with_lz4_compression(true),
             format,
             num_mip_levels: MipLevels::All,
             default_mip_level: 0,
@@ -434,7 +435,7 @@ impl TextureMapBuilder {
 
         let mut data = Self::serialize_mipmaps(&image, generated_mip_levels)?;
         let mut compressed_mip_sizes = mip_sizes;
-        if glacier_game == GlacierGame::HM3 {
+        if glacier_game.supports_lz4_compression() && self.params.flags.lz4_compression() {
             let mut compressed_image_buffer = vec![];
             let mut cursor = Cursor::new(&data);
             for mip in 0..generated_mip_levels as usize {
